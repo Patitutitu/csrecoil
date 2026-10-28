@@ -648,8 +648,8 @@ export function PlayArea({
       )}
 
       {uiStatus === 'finished' && lastResult && (
-        <div className="pointer-events-none absolute inset-x-0 top-12 flex justify-center px-3 sm:top-auto sm:bottom-4">
-          <div className="flex items-center gap-4 rounded-xl bg-black/60 px-4 py-3 ring-1 ring-white/10 backdrop-blur">
+        <div className="pointer-events-none absolute inset-x-0 top-12 z-10 flex justify-center px-3 sm:top-14">
+          <div className="flex items-center gap-4 rounded-xl bg-black/70 px-4 py-3 ring-1 ring-white/10 backdrop-blur">
             <span
               className={cn(
                 'text-4xl font-black tabular-nums',
