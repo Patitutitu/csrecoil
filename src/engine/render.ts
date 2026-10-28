@@ -158,11 +158,6 @@ export function drawFrame(f: Frame): void {
     drawErrorLinks(ctx, view, engine)
   }
 
-  // Impactos visibles en vivo (y al final) para ver dónde pegó cada bala.
-  if (engine.game === 'transfer' || engine.game === 'recoil') {
-    drawImpacts(ctx, view, engine)
-  }
-
   drawPulses(ctx, view, f.pulses, now)
 
   if (running && f.guideAlpha > 0.001) {
@@ -171,6 +166,11 @@ export function drawFrame(f: Frame): void {
 
   if (running) {
     drawRecentTrail(ctx, view, engine, now)
+  }
+
+  // Impactos al frente (estilo SHOW IMPACTS): se leen sobre el path/láser.
+  if (engine.game === 'transfer' || engine.game === 'recoil') {
+    drawImpacts(ctx, view, engine)
   }
 
   const playerPos = engine.status === 'idle' ? { x: 0, y: 0 } : engine.pos
@@ -239,6 +239,19 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, vie
   line(ctx, 0, view.anchor.y, w, view.anchor.y)
   ctx.restore()
 
+  // Punto de mira en el muro (0,0): donde deberían acumularse los impactos si compensás bien.
+  ctx.save()
+  ctx.strokeStyle = 'rgba(250, 250, 250, 0.35)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.arc(view.anchor.x, view.anchor.y, 10, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(103, 232, 249, 0.5)'
+  ctx.beginPath()
+  ctx.arc(view.anchor.x, view.anchor.y, 3, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.restore()
+
   ctx.save()
   ctx.fillStyle = 'rgba(148, 163, 184, 0.55)'
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif'
@@ -249,6 +262,10 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, vie
   const by = h - 16
   ctx.fillRect(bx, by - 1, barLen, 2)
   ctx.fillText('1°', bx + barLen + 6, by + 3)
+  ctx.fillStyle = 'rgba(103, 232, 249, 0.75)'
+  ctx.fillText('impactos', bx, by - 14)
+  ctx.fillStyle = 'rgba(167, 139, 250, 0.75)'
+  ctx.fillText('mira', bx + 64, by - 14)
   ctx.restore()
 }
 
@@ -352,32 +369,72 @@ function drawGhost(
 }
 
 function drawJudgedNodes(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEngine): void {
+  // Nodos del path (dónde debía estar la mira): más chicos y apagados que los impactos del muro.
   ctx.save()
   for (const s of engine.shots) {
     const p = toScreen(view, s.target)
     ctx.beginPath()
-    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
-    ctx.fillStyle = GRADE_COLORS[s.grade]
+    ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(167, 139, 250, 0.55)'
     ctx.fill()
-    ctx.lineWidth = 1.5
-    ctx.strokeStyle = 'rgba(10, 11, 18, 0.9)'
+    ctx.lineWidth = 1.25
+    ctx.strokeStyle = GRADE_COLORS[s.grade]
     ctx.stroke()
   }
   ctx.restore()
 }
 
+/**
+ * Impactos en el muro (estilo Recoil Master “SHOW IMPACTS”): punto cian/ámbar
+ * brillante, distinto del path violeta de la mira. Así se nota dónde pegó cada bala.
+ */
 function drawImpacts(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEngine): void {
   ctx.save()
   for (const s of engine.shots) {
     const p = toScreen(view, s.impact)
-    ctx.fillStyle = GRADE_COLORS[s.grade]
-    ctx.globalAlpha = 0.9
-    ctx.strokeStyle = 'rgba(10, 11, 18, 0.85)'
-    ctx.lineWidth = 1
+    const miss = s.grade === 'miss'
+    const core = miss ? '#fb7185' : '#67e8f9'
+    const glow = miss ? 'rgba(251, 113, 133, 0.55)' : 'rgba(34, 211, 238, 0.55)'
+    const r = miss ? 6 : 5.5
+
+    // halo (como el glow de SHOW IMPACTS en CS2)
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.2)
+    g.addColorStop(0, glow)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    ctx.fillStyle = g
     ctx.beginPath()
-    ctx.rect(p.x - 4, p.y - 4, 8, 8)
+    ctx.arc(p.x, p.y, r * 3.2, 0, Math.PI * 2)
     ctx.fill()
+
+    // “decal” oscuro detrás, como el agujero en la pared
+    ctx.fillStyle = 'rgba(15, 18, 28, 0.92)'
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, r + 1.5, 0, Math.PI * 2)
+    ctx.fill()
+
+    // núcleo brillante
+    ctx.fillStyle = core
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = miss ? '#ffe4e6' : '#ecfeff'
+    ctx.beginPath()
+    ctx.arc(p.x - r * 0.25, p.y - r * 0.25, r * 0.35, 0, Math.PI * 2)
+    ctx.fill()
+
+    // anillo de grade (solo borde fino) para no confundir con el path
+    ctx.strokeStyle = GRADE_COLORS[s.grade]
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, r + 2.5, 0, Math.PI * 2)
     ctx.stroke()
+
+    // número de bala, legible sobre el glow
+    ctx.fillStyle = 'rgba(248, 250, 252, 0.92)'
+    ctx.font = '700 9px ui-sans-serif, system-ui, sans-serif'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(s.index + 1), p.x + r + 4, p.y)
   }
   ctx.restore()
 }
