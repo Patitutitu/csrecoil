@@ -200,15 +200,32 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
             </div>
           </div>
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Poné la misma resolución que usás en CS2 (incluida stretched 4:3). FOV por defecto es 90
-            (Source hor+). El inicio del recoil (0,0) queda en el centro; no se estira el patrón para
-            “que entre”.
+            Misma resolución que en CS2 (si jugás stretched, la del juego: 1280×960, etc.). FOV default
+            90. El inicio del recoil (0,0) queda en el centro.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between">
+            <Label>Zoom del gráfico</Label>
+            <span className="text-xs tabular-nums text-muted-foreground">{settings.viewZoom}×</span>
+          </div>
+          <Slider
+            min={1}
+            max={4}
+            step={0.5}
+            value={[settings.viewZoom]}
+            onValueChange={(v) => onChange({ viewZoom: Array.isArray(v) ? v[0] : v })}
+          />
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            1× = tamaño relativo a tu resolución en esta ventana. 2–3× agranda el path para verlo mejor;
+            el mouse sigue moviéndose en grados reales de CS2 (cm/counts no cambian).
           </p>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Desactivá la aceleración del mouse del sistema. El simulador pide movimiento sin ajustes al
-          capturar el puntero, pero no todos los navegadores lo respetan.
+          Desactivá la aceleración del mouse en Windows («Mejorar precisión del puntero»). Chrome/Edge
+          con raw input se sienten más cerca del juego.
         </p>
 
         <div className="flex flex-col gap-3 rounded-lg border border-border p-3">

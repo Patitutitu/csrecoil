@@ -19,6 +19,8 @@ import { randomSeed } from '@/lib/random'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 
+const ZOOM_PRESETS = [1, 1.5, 2, 2.5, 3, 4] as const
+
 export interface PlayAreaProps {
   weapon: WeaponDef
   mode: DrillMode
@@ -30,6 +32,7 @@ export interface PlayAreaProps {
   seed?: number
   ghost?: RunResult | null
   onFinished: (result: RunResult) => void
+  onChangeSettings?: (patch: Partial<Settings>) => void
 }
 
 type LockState = 'unlocked' | 'locked' | 'fallback'
@@ -62,6 +65,7 @@ export function PlayArea({
   seed: seedProp,
   ghost,
   onFinished,
+  onChangeSettings,
 }: PlayAreaProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -476,6 +480,7 @@ export function PlayArea({
             resWidth: settings.resWidth,
             resHeight: settings.resHeight,
             fov: settings.fov,
+            viewZoom: settings.viewZoom,
           })
         }
       }
@@ -486,7 +491,16 @@ export function PlayArea({
       cancelAnimationFrame(raf)
       ro.disconnect()
     }
-  }, [game, handleSprayEvents, handleStrafeEvents, settings.ghost, settings.resWidth, settings.resHeight, settings.fov])
+  }, [
+    game,
+    handleSprayEvents,
+    handleStrafeEvents,
+    settings.ghost,
+    settings.resWidth,
+    settings.resHeight,
+    settings.fov,
+    settings.viewZoom,
+  ])
 
   const bullets = bulletsForMode(weapon, mode, customBullets)
   const gameLabel = game === 'recoil' ? 'Spray' : game === 'transfer' ? 'Transfer' : 'Strafe'
@@ -499,8 +513,8 @@ export function PlayArea({
       style={{ aspectRatio: String(aspect) }}
       className={cn(
         'relative w-full overflow-hidden rounded-xl border border-white/10 bg-[#0a0b12] shadow-2xl shadow-black/40',
-        // Misma relación de aspecto que tu resolución de CS2; origen del recoil en el centro.
-        'min-h-[420px] sm:min-h-[480px] lg:min-h-[520px]',
+        // Canvas grande: el path se lee mejor; aspect = resolución CS2; origen en el centro.
+        'min-h-[560px] max-h-[min(78vh,920px)] sm:min-h-[640px] lg:min-h-[720px]',
         lockState === 'locked' ? 'cursor-none' : 'cursor-crosshair',
       )}
     >
@@ -520,9 +534,34 @@ export function PlayArea({
           {bpmForCycle(weapon.cycleMs).toFixed(1)} BPM
         </Badge>
         <Badge variant="outline" className="hidden border-cyan-400/30 text-cyan-200/80 lg:inline-flex">
-          {settings.resWidth}×{settings.resHeight} · FOV {settings.fov}
+          {settings.resWidth}×{settings.resHeight} · FOV {settings.fov} · {settings.viewZoom}×
         </Badge>
       </div>
+
+      {onChangeSettings && game !== 'strafe' && (
+        <div className="absolute right-3 bottom-14 z-10 flex items-center gap-1 rounded-lg bg-black/45 p-1 ring-1 ring-white/10 backdrop-blur">
+          <span className="px-1.5 text-[10px] tracking-wide text-white/50 uppercase">Zoom</span>
+          {ZOOM_PRESETS.map((z) => {
+            const active = Math.abs(settings.viewZoom - z) < 0.05
+            return (
+              <button
+                key={z}
+                type="button"
+                className={cn(
+                  'rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors',
+                  active ? 'bg-cyan-500/30 text-cyan-100' : 'text-white/55 hover:bg-white/10 hover:text-white',
+                )}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onChangeSettings({ viewZoom: z })
+                }}
+              >
+                {z}×
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {isTouch && (
         <Overlay>

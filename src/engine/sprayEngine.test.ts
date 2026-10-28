@@ -112,9 +112,10 @@ describe('unidades', () => {
     expect(pixelsPerDegree(1600, 900, 90)).toBeCloseTo(10.472, 2)
   })
 
-  it('escala de canvas = px/° del juego × (ancho canvas / res)', () => {
+  it('escala de canvas = px/° del juego × (ancho canvas / res) × zoom', () => {
     const game = pixelsPerDegree(1920, 1080, 90)
     expect(displayPixelsPerDegree(960, 1920, 1080, 90)).toBeCloseTo(game * 0.5, 5)
+    expect(displayPixelsPerDegree(960, 1920, 1080, 90, 2.5)).toBeCloseTo(game * 0.5 * 2.5, 5)
   })
 })
 
@@ -137,6 +138,17 @@ describe('viewport simulador', () => {
     const tip = toScreen(view, { x: 0, y: -12 })
     expect(tip.y - view.anchor.y).toBeCloseTo(12 * view.ppd, 5)
     expect(Math.abs(tip.y - view.anchor.y)).toBeLessThan(540 * 0.35)
+  })
+
+  it('viewZoom agranda el gráfico sin mover el ancla (0,0)', () => {
+    const view = computeViewport(960, 540, [], {
+      resWidth: 1920,
+      resHeight: 1080,
+      fov: 90,
+      viewZoom: 2.5,
+    })
+    expect(view.anchor).toEqual({ x: 480, y: 270 })
+    expect(view.ppd).toBeCloseTo(pixelsPerDegree(1920, 1080, 90) * 0.5 * 2.5, 5)
   })
 })
 

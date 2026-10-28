@@ -56,6 +56,8 @@ export interface Frame {
   resWidth?: number
   resHeight?: number
   fov?: number
+  /** Zoom de práctica (agranda el gráfico; mouse sigue en grados). */
+  viewZoom?: number
 }
 
 export interface StrafeFrame {
@@ -79,18 +81,19 @@ export interface ViewportOpts {
   resWidth?: number
   resHeight?: number
   fov?: number
+  viewZoom?: number
 }
 
 /**
  * Simulador CS2: el inicio del recoil (0,0) queda en el centro de la pantalla.
- * La escala es la de tu resolución/FOV (no se estira el patrón para “que entre”).
- * Así 1° de mouse se ve igual que en el juego.
+ * Escala = resolución/FOV de CS2 × zoom de práctica (no fit-to-screen del patrón).
  */
 export function computeViewport(width: number, height: number, _path: Vec2[], opts: ViewportOpts = {}): Viewport {
   const resW = opts.resWidth ?? 1920
   const resH = opts.resHeight ?? 1080
   const fov = opts.fov ?? 90
-  const ppd = displayPixelsPerDegree(width, resW, resH, fov)
+  const zoom = opts.viewZoom ?? 1
+  const ppd = displayPixelsPerDegree(width, resW, resH, fov, zoom)
   return { anchor: { x: width / 2, y: height / 2 }, ppd }
 }
 
@@ -104,6 +107,7 @@ export function drawFrame(f: Frame): void {
     resWidth: f.resWidth,
     resHeight: f.resHeight,
     fov: f.fov,
+    viewZoom: f.viewZoom,
   })
 
   drawBackground(ctx, width, height, view)

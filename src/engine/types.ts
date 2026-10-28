@@ -117,6 +117,11 @@ export interface Settings {
    * en widescreen se escala (hor+), igual que en el juego.
    */
   fov: number
+  /**
+   * Zoom de práctica sobre la escala CS2 (1 = tamaño real en pantalla relativa,
+   * 2–3 = gráfico más grande para ver el path; el mouse sigue en grados reales).
+   */
+  viewZoom: number
   audio: boolean
   beat: boolean
   volume: number

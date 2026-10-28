@@ -54,16 +54,19 @@ export function pixelsPerDegree(resWidth: number, resHeight: number, fovSetting 
 
 /**
  * Escala de dibujo en el canvas: mismos grados que en CS2, escalados al ancho del canvas
- * respecto a tu resolución (la ventana de práctica es una vista a escala del juego).
+ * respecto a tu resolución. `viewZoom` agranda el gráfico para practicar sin cambiar
+ * los grados del mouse (1 = tamaño relativo al juego, 2–3 = más legible).
  */
 export function displayPixelsPerDegree(
   canvasWidth: number,
   resWidth: number,
   resHeight: number,
   fovSetting = 90,
+  viewZoom = 1,
 ): number {
   const game = pixelsPerDegree(resWidth, resHeight, fovSetting)
-  return game * (canvasWidth / Math.max(1, resWidth))
+  const zoom = Number.isFinite(viewZoom) && viewZoom > 0 ? viewZoom : 1
+  return game * (canvasWidth / Math.max(1, resWidth)) * zoom
 }
 
 /** Cantidad de balas del ejercicio. En modo `custom` usa `customBullets` (acotado al cargador). */

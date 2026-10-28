@@ -11,6 +11,8 @@ export const DEFAULT_SETTINGS: Settings = {
   resWidth: 1920,
   resHeight: 1080,
   fov: 90,
+  // 2.5×: gráfico legible en la ventana; el mouse sigue en grados CS2.
+  viewZoom: 2.5,
   audio: true,
   beat: true,
   volume: 0.6,
@@ -45,6 +47,10 @@ function normalizeSettings(raw: Settings): Settings {
     resWidth: Number.isFinite(raw.resWidth) && raw.resWidth >= 640 ? Math.round(raw.resWidth) : DEFAULT_SETTINGS.resWidth,
     resHeight: Number.isFinite(raw.resHeight) && raw.resHeight >= 480 ? Math.round(raw.resHeight) : DEFAULT_SETTINGS.resHeight,
     fov: Number.isFinite(raw.fov) && raw.fov >= 60 && raw.fov <= 120 ? raw.fov : DEFAULT_SETTINGS.fov,
+    viewZoom:
+      Number.isFinite(raw.viewZoom) && raw.viewZoom >= 1 && raw.viewZoom <= 5
+        ? Math.round(raw.viewZoom * 10) / 10
+        : DEFAULT_SETTINGS.viewZoom,
     volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : DEFAULT_SETTINGS.volume,
     audio: Boolean(raw.audio ?? DEFAULT_SETTINGS.audio),
     beat: Boolean(raw.beat ?? DEFAULT_SETTINGS.beat),

@@ -325,7 +325,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="mx-auto grid max-w-[1600px] gap-4 px-3 py-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <main className="mx-auto grid max-w-[1680px] gap-4 px-3 py-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1.15fr)_300px]">
           <section className="flex min-w-0 flex-col gap-3">
             {warmup && (
               <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
@@ -348,6 +348,7 @@ export default function App() {
               seed={session.seed}
               ghost={settings.ghost ? best : null}
               onFinished={onFinished}
+              onChangeSettings={updateSettings}
             />
             <div className="grid gap-4 md:grid-cols-2">
               <ResultsPanel

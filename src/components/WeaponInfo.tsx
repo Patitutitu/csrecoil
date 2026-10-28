@@ -63,7 +63,7 @@ export function WeaponInfo({ weapon, mode, settings, customBullets = 15 }: Weapo
           <Stat
             label="Escala CS2"
             value={`${ppd.toFixed(1)} px/°`}
-            sub={`FOV ${settings.fov} → ${hFov.toFixed(1)}° hor.`}
+            sub={`FOV ${hFov.toFixed(1)}° · zoom ${settings.viewZoom}×`}
           />
         </div>
         <Button
