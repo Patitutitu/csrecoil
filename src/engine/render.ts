@@ -1,5 +1,6 @@
 import { HITBOX } from '@/lib/transfer'
 import type { ChartNote, StrafeChart } from '@/lib/strafeChart'
+import { displayPixelsPerDegree } from '@/lib/units'
 import type { SprayEngine } from './sprayEngine'
 import type { StrafeEngine } from './strafeEngine'
 import type { HitGrade, RunResult, TracePoint, Vec2 } from './types'
@@ -51,6 +52,10 @@ export interface Frame {
   ghost?: RunResult | null
   speedFrac?: number
   keys?: { a: boolean; d: boolean }
+  /** Resolución/FOV de CS2 del jugador → escala visual real (px/°). */
+  resWidth?: number
+  resHeight?: number
+  fov?: number
 }
 
 export interface StrafeFrame {
@@ -70,27 +75,23 @@ export interface Viewport {
   ppd: number
 }
 
-/** Encuadra la trayectoria del modo actual: el ancla arriba y la compensación cayendo hacia abajo. */
-export function computeViewport(width: number, height: number, path: Vec2[]): Viewport {
-  let maxDown = 0
-  let maxSide = 0
-  let minY = 0
-  let maxY = 0
-  for (const p of path) {
-    maxDown = Math.max(maxDown, -p.y)
-    maxSide = Math.max(maxSide, Math.abs(p.x))
-    minY = Math.min(minY, p.y)
-    maxY = Math.max(maxY, p.y)
-  }
-  // Transfer: offsets en y=0, path puede ir más ancho.
-  // Menos padding vertical → el pattern y los impactos usan casi toda la altura.
-  const spanY = Math.max(maxDown * 1.08, Math.max(maxY - minY, 3) * 1.05, 3)
-  const spanX = Math.max(maxSide * 1.25, 2.5)
-  const padTop = Math.max(36, height * 0.06)
-  const padBottom = Math.max(64, height * 0.11) // deja aire para A/D y la barra de 1°
-  const padX = width * 0.06
-  const ppd = Math.min((height - padTop - padBottom) / spanY, (width - 2 * padX) / (2 * spanX))
-  return { anchor: { x: width / 2, y: padTop }, ppd }
+export interface ViewportOpts {
+  resWidth?: number
+  resHeight?: number
+  fov?: number
+}
+
+/**
+ * Simulador CS2: el inicio del recoil (0,0) queda en el centro de la pantalla.
+ * La escala es la de tu resolución/FOV (no se estira el patrón para “que entre”).
+ * Así 1° de mouse se ve igual que en el juego.
+ */
+export function computeViewport(width: number, height: number, _path: Vec2[], opts: ViewportOpts = {}): Viewport {
+  const resW = opts.resWidth ?? 1920
+  const resH = opts.resHeight ?? 1080
+  const fov = opts.fov ?? 90
+  const ppd = displayPixelsPerDegree(width, resW, resH, fov)
+  return { anchor: { x: width / 2, y: height / 2 }, ppd }
 }
 
 export function toScreen(v: Viewport, p: Vec2): Vec2 {
@@ -99,7 +100,11 @@ export function toScreen(v: Viewport, p: Vec2): Vec2 {
 
 export function drawFrame(f: Frame): void {
   const { ctx, width, height, engine, now } = f
-  const view = computeViewport(width, height, engine.path)
+  const view = computeViewport(width, height, engine.path, {
+    resWidth: f.resWidth,
+    resHeight: f.resHeight,
+    fov: f.fov,
+  })
 
   drawBackground(ctx, width, height, view)
 
@@ -171,6 +176,9 @@ export function drawStrafeFrame(f: StrafeFrame): void {
       judgments: [],
       reveal: engine.burst.status === 'finished',
       speedFrac: f.speedFrac,
+      resWidth: 1920,
+      resHeight: 1080,
+      fov: 90,
     }
     ctx.save()
     ctx.translate(width - mini.width - 12, height - mini.height - 48)

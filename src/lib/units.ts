@@ -31,6 +31,41 @@ export function mouseDeltaToViewDeg(dx: number, dy: number, sensitivity: number)
   return { x: dx * k, y: -dy * k }
 }
 
+/**
+ * FOV horizontal real en pantalla, como CS2/Source (fov_cs = FOV en 4:3, hor+ en widescreen).
+ * Con fov 90 y 16:9 da ≈ 106,26°.
+ */
+export function cs2HorizontalFovDeg(aspect: number, fovSetting = 90): number {
+  const half = (fovSetting * Math.PI) / 180 / 2
+  const vHalf = Math.atan(Math.tan(half) * (3 / 4))
+  return (2 * Math.atan(Math.tan(vHalf) * aspect) * 180) / Math.PI
+}
+
+/**
+ * Píxeles por grado en el centro de la pantalla a la resolución/FOV de CS2.
+ * Es lo que hace que 1° de mira se vea igual que en el juego.
+ */
+export function pixelsPerDegree(resWidth: number, resHeight: number, fovSetting = 90): number {
+  const aspect = resWidth / Math.max(1, resHeight)
+  const hFov = cs2HorizontalFovDeg(aspect, fovSetting)
+  const f = resWidth / 2 / Math.tan(((hFov / 2) * Math.PI) / 180)
+  return f * (Math.PI / 180)
+}
+
+/**
+ * Escala de dibujo en el canvas: mismos grados que en CS2, escalados al ancho del canvas
+ * respecto a tu resolución (la ventana de práctica es una vista a escala del juego).
+ */
+export function displayPixelsPerDegree(
+  canvasWidth: number,
+  resWidth: number,
+  resHeight: number,
+  fovSetting = 90,
+): number {
+  const game = pixelsPerDegree(resWidth, resHeight, fovSetting)
+  return game * (canvasWidth / Math.max(1, resWidth))
+}
+
 /** Cantidad de balas del ejercicio. En modo `custom` usa `customBullets` (acotado al cargador). */
 export function bulletsForMode(weapon: WeaponDef, mode: DrillMode, customBullets = 15): number {
   switch (mode) {

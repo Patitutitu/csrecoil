@@ -3,7 +3,7 @@
 Juego web estilo "de ritmo" para practicar el control de spray de CS2 con la **cadencia real del arma**. Tres minijuegos basados en reglas del juego: Spray, Spray Transfer y Strafe A/D (estilo Guitar Hero).
 
 - **La cadencia es sagrada.** La AK-47 dispara cada 100 ms (600 RPM), la M4A4 cada 90 ms (667 RPM)... No hay modo lento: el ritmo se adapta al arma.
-- **Todo se mide en grados.** Con tu sensibilidad de CS2 (`sens × 0.022°` por count) el movimiento del mousepad es el mismo que en el juego.
+- **Simulador, no arcade.** Sens + DPI + resolución + FOV de CS2: la mira se mueve en grados reales (`sens × 0.022°` por count) y 1° ocupa los mismos píxeles relativos que en el juego. El inicio del recoil (0,0) está en el **centro** de la pantalla; el patrón no se estira para “que entre”.
 - **Disparar en movimiento falla.** Por encima del 34 % de la velocidad máxima del arma aparece dispersión (como en CS2). Frená con counter-strafe (tecla opuesta) antes de tirar.
 
 ## Cómo correrlo
@@ -20,7 +20,7 @@ Requiere un navegador de escritorio con mouse. Chrome/Edge usan `pointerrawupdat
 ## Cómo se juega
 
 1. Elegí **minijuego** (`Tab`), arma (`1`–`9`), ejercicio (`Q`/`W`/`E`) y guía (`G`).
-2. Click para capturar el mouse. **Click derecho** (o Esc) lo libera. En Ajustes cargá tu sens y DPI.
+2. Click para capturar el mouse. **Click derecho** (o Esc) lo libera. En Ajustes cargá tu sens, DPI y la **misma resolución/FOV** que usás en CS2.
 3. **Spray**: mantené click izquierdo y seguí el láser. Cada bala perfecta en el instante del disparo pega en (0,0).
 4. **Transfer**: 4 impactos al pecho por objetivo en línea (`y = 0`). Mové en X sin perder altura.
 5. **Strafe**: partitura A/D (notas sostenidas) + ventanas FIRE. Solo dispará quieto (≤34 % velocidad).

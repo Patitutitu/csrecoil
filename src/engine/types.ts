@@ -108,6 +108,15 @@ export interface RunResult {
 export interface Settings {
   sensitivity: number
   dpi: number
+  /** Resolución de CS2 (ancho en px). Define cuántos px vale 1° en pantalla. */
+  resWidth: number
+  /** Resolución de CS2 (alto en px). */
+  resHeight: number
+  /**
+   * FOV de CS2 (default 90). En Source/CS es el FOV horizontal en 4:3;
+   * en widescreen se escala (hor+), igual que en el juego.
+   */
+  fov: number
   audio: boolean
   beat: boolean
   volume: number

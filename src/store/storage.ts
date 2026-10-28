@@ -8,6 +8,9 @@ const MAX_HISTORY = 400
 export const DEFAULT_SETTINGS: Settings = {
   sensitivity: 1.0,
   dpi: 800,
+  resWidth: 1920,
+  resHeight: 1080,
+  fov: 90,
   audio: true,
   beat: true,
   volume: 0.6,
@@ -33,10 +36,30 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+function normalizeSettings(raw: Settings): Settings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...raw,
+    sensitivity: Number.isFinite(raw.sensitivity) && raw.sensitivity > 0 ? raw.sensitivity : DEFAULT_SETTINGS.sensitivity,
+    dpi: Number.isFinite(raw.dpi) && raw.dpi >= 100 ? raw.dpi : DEFAULT_SETTINGS.dpi,
+    resWidth: Number.isFinite(raw.resWidth) && raw.resWidth >= 640 ? Math.round(raw.resWidth) : DEFAULT_SETTINGS.resWidth,
+    resHeight: Number.isFinite(raw.resHeight) && raw.resHeight >= 480 ? Math.round(raw.resHeight) : DEFAULT_SETTINGS.resHeight,
+    fov: Number.isFinite(raw.fov) && raw.fov >= 60 && raw.fov <= 120 ? raw.fov : DEFAULT_SETTINGS.fov,
+    volume: Number.isFinite(raw.volume) ? Math.min(1, Math.max(0, raw.volume)) : DEFAULT_SETTINGS.volume,
+    audio: Boolean(raw.audio ?? DEFAULT_SETTINGS.audio),
+    beat: Boolean(raw.beat ?? DEFAULT_SETTINGS.beat),
+    ghost: Boolean(raw.ghost ?? DEFAULT_SETTINGS.ghost),
+    playerName: typeof raw.playerName === 'string' && raw.playerName.trim() ? raw.playerName : DEFAULT_SETTINGS.playerName,
+  }
+}
+
 export function useSettings(): [Settings, (patch: Partial<Settings>) => void] {
-  const [settings, setSettings] = useState<Settings>(() => readJson(SETTINGS_KEY, DEFAULT_SETTINGS))
+  const [settings, setSettings] = useState<Settings>(() => normalizeSettings(readJson(SETTINGS_KEY, DEFAULT_SETTINGS)))
   useEffect(() => writeJson(SETTINGS_KEY, settings), [settings])
-  const update = useCallback((patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch })), [])
+  const update = useCallback(
+    (patch: Partial<Settings>) => setSettings((s) => normalizeSettings({ ...s, ...patch })),
+    [],
+  )
   return [settings, update]
 }
 

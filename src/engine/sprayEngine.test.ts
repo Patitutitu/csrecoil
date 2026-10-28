@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { WEAPONS, WEAPON_BY_ID } from '@/data/weapons'
-import { bpmForCycle, compensationPath, degToCm, degToCounts, mouseDeltaToViewDeg } from '@/lib/units'
+import {
+  bpmForCycle,
+  compensationPath,
+  cs2HorizontalFovDeg,
+  degToCm,
+  degToCounts,
+  displayPixelsPerDegree,
+  mouseDeltaToViewDeg,
+  pixelsPerDegree,
+} from '@/lib/units'
 import { comboMultiplier, gradeForError, summarize } from './scoring'
+import { computeViewport, toScreen } from './render'
 import { SprayEngine } from './sprayEngine'
 
 describe('datos de armas', () => {
@@ -88,6 +98,45 @@ describe('unidades', () => {
   it('tempo equivalente: AK 150 BPM, M4A4 166.7 BPM', () => {
     expect(bpmForCycle(100)).toBeCloseTo(150)
     expect(bpmForCycle(90)).toBeCloseTo(166.67, 1)
+  })
+
+  it('FOV Source hor+: 90 en 16:9 ≈ 106,26°', () => {
+    expect(cs2HorizontalFovDeg(16 / 9, 90)).toBeCloseTo(106.26, 1)
+    expect(cs2HorizontalFovDeg(4 / 3, 90)).toBeCloseTo(90, 2)
+  })
+
+  it('px/° en 1920×1080 FOV 90 ≈ 12,57 (focal 720, no promedio)', () => {
+    const ppd = pixelsPerDegree(1920, 1080, 90)
+    expect(ppd).toBeCloseTo(12.566, 2)
+    // 1600×900: focal 600, como en la medición de videos
+    expect(pixelsPerDegree(1600, 900, 90)).toBeCloseTo(10.472, 2)
+  })
+
+  it('escala de canvas = px/° del juego × (ancho canvas / res)', () => {
+    const game = pixelsPerDegree(1920, 1080, 90)
+    expect(displayPixelsPerDegree(960, 1920, 1080, 90)).toBeCloseTo(game * 0.5, 5)
+  })
+})
+
+describe('viewport simulador', () => {
+  it('el origen del recoil (0,0) queda en el centro de la pantalla', () => {
+    const view = computeViewport(800, 450, [], { resWidth: 1920, resHeight: 1080, fov: 90 })
+    expect(view.anchor).toEqual({ x: 400, y: 225 })
+    const origin = toScreen(view, { x: 0, y: 0 })
+    expect(origin).toEqual({ x: 400, y: 225 })
+  })
+
+  it('no estira el patrón: ppd es la de CS2 a escala, no fit-to-screen', () => {
+    const path = [
+      { x: 0, y: 0 },
+      { x: 0, y: -12 },
+    ]
+    const view = computeViewport(960, 540, path, { resWidth: 1920, resHeight: 1080, fov: 90 })
+    expect(view.ppd).toBeCloseTo(pixelsPerDegree(1920, 1080, 90) * 0.5, 5)
+    // 12° de pull-down ≈ 75 px en un canvas a mitad de 1080p — no llena la altura
+    const tip = toScreen(view, { x: 0, y: -12 })
+    expect(tip.y - view.anchor.y).toBeCloseTo(12 * view.ppd, 5)
+    expect(Math.abs(tip.y - view.anchor.y)).toBeLessThan(540 * 0.35)
   })
 })
 

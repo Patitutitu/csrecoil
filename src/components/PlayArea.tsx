@@ -473,6 +473,9 @@ export function PlayArea({
             ghost: settings.ghost ? ghostRef.current : null,
             speedFrac,
             keys: keyState,
+            resWidth: settings.resWidth,
+            resHeight: settings.resHeight,
+            fov: settings.fov,
           })
         }
       }
@@ -483,18 +486,21 @@ export function PlayArea({
       cancelAnimationFrame(raf)
       ro.disconnect()
     }
-  }, [game, handleSprayEvents, handleStrafeEvents, settings.ghost])
+  }, [game, handleSprayEvents, handleStrafeEvents, settings.ghost, settings.resWidth, settings.resHeight, settings.fov])
 
   const bullets = bulletsForMode(weapon, mode, customBullets)
   const gameLabel = game === 'recoil' ? 'Spray' : game === 'transfer' ? 'Transfer' : 'Strafe'
 
+  const aspect = settings.resWidth / Math.max(1, settings.resHeight)
+
   return (
     <div
       ref={wrapperRef}
+      style={{ aspectRatio: String(aspect) }}
       className={cn(
         'relative w-full overflow-hidden rounded-xl border border-white/10 bg-[#0a0b12] shadow-2xl shadow-black/40',
-        // Más alto que ancho para leer bien el pull-down y los impactos.
-        'min-h-[560px] aspect-[3/4] sm:min-h-[680px] sm:aspect-[5/4] lg:min-h-[760px] lg:aspect-[4/3]',
+        // Misma relación de aspecto que tu resolución de CS2; origen del recoil en el centro.
+        'min-h-[420px] sm:min-h-[480px] lg:min-h-[520px]',
         lockState === 'locked' ? 'cursor-none' : 'cursor-crosshair',
       )}
     >
@@ -512,6 +518,9 @@ export function PlayArea({
         </Badge>
         <Badge variant="outline" className="hidden border-white/20 text-white/60 sm:inline-flex">
           {bpmForCycle(weapon.cycleMs).toFixed(1)} BPM
+        </Badge>
+        <Badge variant="outline" className="hidden border-cyan-400/30 text-cyan-200/80 lg:inline-flex">
+          {settings.resWidth}×{settings.resHeight} · FOV {settings.fov}
         </Badge>
       </div>
 

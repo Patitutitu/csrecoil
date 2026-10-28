@@ -1,7 +1,15 @@
 import { Music2 } from 'lucide-react'
 import { audioEngine } from '@/engine/audio'
 import type { DrillMode, Settings, WeaponDef } from '@/engine/types'
-import { bpmForCycle, bulletsForMode, compensationPath, degToCm, degToCounts } from '@/lib/units'
+import {
+  bpmForCycle,
+  bulletsForMode,
+  compensationPath,
+  cs2HorizontalFovDeg,
+  degToCm,
+  degToCounts,
+  pixelsPerDegree,
+} from '@/lib/units'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -30,12 +38,16 @@ export function WeaponInfo({ weapon, mode, settings, customBullets = 15 }: Weapo
   const durationMs = (bullets - 1) * weapon.cycleMs
   const counts = degToCounts(pullDownDeg, settings.sensitivity)
   const cm = degToCm(pullDownDeg, settings.sensitivity, settings.dpi)
+  const hFov = cs2HorizontalFovDeg(settings.resWidth / settings.resHeight, settings.fov)
+  const ppd = pixelsPerDegree(settings.resWidth, settings.resHeight, settings.fov)
 
   return (
     <Card className="gap-3 py-4">
       <CardHeader className="px-4">
         <CardTitle>Ficha de la ráfaga</CardTitle>
-        <CardDescription>Con tu sens {settings.sensitivity} y {settings.dpi} DPI</CardDescription>
+        <CardDescription>
+          Sens {settings.sensitivity} · {settings.dpi} DPI · {settings.resWidth}×{settings.resHeight}
+        </CardDescription>
       </CardHeader>
       <CardContent className="px-4">
         <div className="grid grid-cols-2 gap-1.5">
@@ -48,7 +60,11 @@ export function WeaponInfo({ weapon, mode, settings, customBullets = 15 }: Weapo
             value={`${last.x >= 0 ? '→' : '←'} ${Math.abs(last.x).toFixed(2)}°`}
             sub="mouse en la última bala"
           />
-          <Stat label="Cargador" value={`${weapon.magazine}`} sub="balas" />
+          <Stat
+            label="Escala CS2"
+            value={`${ppd.toFixed(1)} px/°`}
+            sub={`FOV ${settings.fov} → ${hFov.toFixed(1)}° hor.`}
+          />
         </div>
         <Button
           variant="outline"

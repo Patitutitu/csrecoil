@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import type { Settings } from '@/engine/types'
-import { cmPer360 } from '@/lib/units'
+import { cmPer360, cs2HorizontalFovDeg, pixelsPerDegree } from '@/lib/units'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -17,6 +17,18 @@ import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 
+/** Resoluciones típicas de CS2 (nativas y 4:3/5:4 de stretched). */
+const RES_PRESETS: { label: string; w: number; h: number }[] = [
+  { label: '1920×1080', w: 1920, h: 1080 },
+  { label: '1600×900', w: 1600, h: 900 },
+  { label: '1280×960', w: 1280, h: 960 },
+  { label: '1440×1080', w: 1440, h: 1080 },
+  { label: '1280×1024', w: 1280, h: 1024 },
+  { label: '1024×768', w: 1024, h: 768 },
+  { label: '2560×1440', w: 2560, h: 1440 },
+  { label: '1680×1050', w: 1680, h: 1050 },
+]
+
 interface SettingsDialogProps {
   settings: Settings
   onChange: (patch: Partial<Settings>) => void
@@ -27,24 +39,57 @@ interface SettingsDialogProps {
 export function SettingsDialog({ settings, onChange, open, onOpenChange }: SettingsDialogProps) {
   const [sens, setSens] = useState(String(settings.sensitivity))
   const [dpi, setDpi] = useState(String(settings.dpi))
+  const [resW, setResW] = useState(String(settings.resWidth))
+  const [resH, setResH] = useState(String(settings.resHeight))
+  const [fov, setFov] = useState(String(settings.fov))
 
   const handleOpenChange = (next: boolean) => {
     if (next) {
       setSens(String(settings.sensitivity))
       setDpi(String(settings.dpi))
+      setResW(String(settings.resWidth))
+      setResH(String(settings.resHeight))
+      setFov(String(settings.fov))
     }
     onOpenChange(next)
   }
 
   const sensNum = Number.parseFloat(sens.replace(',', '.'))
   const dpiNum = Number.parseInt(dpi, 10)
+  const resWNum = Number.parseInt(resW, 10)
+  const resHNum = Number.parseInt(resH, 10)
+  const fovNum = Number.parseFloat(fov.replace(',', '.'))
+
   const sensValid = Number.isFinite(sensNum) && sensNum > 0 && sensNum <= 20
   const dpiValid = Number.isFinite(dpiNum) && dpiNum >= 100 && dpiNum <= 32000
+  const resValid =
+    Number.isFinite(resWNum) &&
+    Number.isFinite(resHNum) &&
+    resWNum >= 640 &&
+    resWNum <= 7680 &&
+    resHNum >= 480 &&
+    resHNum <= 4320
+  const fovValid = Number.isFinite(fovNum) && fovNum >= 60 && fovNum <= 120
+  const formValid = sensValid && dpiValid && resValid && fovValid
+
+  const hFov = resValid && fovValid ? cs2HorizontalFovDeg(resWNum / resHNum, fovNum) : 0
+  const ppd = resValid && fovValid ? pixelsPerDegree(resWNum, resHNum, fovNum) : 0
 
   const apply = () => {
-    if (!sensValid || !dpiValid) return
-    onChange({ sensitivity: sensNum, dpi: dpiNum })
+    if (!formValid) return
+    onChange({
+      sensitivity: sensNum,
+      dpi: dpiNum,
+      resWidth: resWNum,
+      resHeight: resHNum,
+      fov: fovNum,
+    })
     onOpenChange(false)
+  }
+
+  const pickPreset = (w: number, h: number) => {
+    setResW(String(w))
+    setResH(String(h))
   }
 
   return (
@@ -57,18 +102,18 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Ajustes</DialogTitle>
+          <DialogTitle>Ajustes del simulador</DialogTitle>
           <DialogDescription>
-            Usá exactamente tu sensibilidad y DPI de CS2: así el movimiento que practicás es el mismo que hacés en el juego
-            (0,022° por count × sens).
+            Sens, DPI, resolución y FOV de CS2. La mira se mueve en grados reales (sens × 0,022°) y la
+            escala en pantalla usa tu resolución: 1° se ve igual que en el juego.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="sens">Sensibilidad en CS2</Label>
+            <Label htmlFor="sens">Sensibilidad</Label>
             <Input
               id="sens"
               inputMode="decimal"
@@ -93,11 +138,77 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
         <p className="-mt-1 text-xs text-muted-foreground">
           {sensValid && dpiValid
             ? `eDPI ${Math.round(sensNum * dpiNum)} · ${cmPer360(sensNum, dpiNum).toFixed(1)} cm/360°`
-            : 'Ingresá una sensibilidad entre 0,1 y 20 y un DPI entre 100 y 32000.'}
+            : 'Sensibilidad 0,1–20 · DPI 100–32000.'}
         </p>
-        <p className="-mt-1 text-xs text-muted-foreground">
-          Desactivá la aceleración del mouse del sistema. El juego pide movimiento sin ajustes al capturar el puntero,
-          pero no todos los navegadores lo respetan.
+
+        <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <Label>Resolución de CS2</Label>
+            {resValid && fovValid && (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                FOV hor. {hFov.toFixed(1)}° · {ppd.toFixed(1)} px/°
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {RES_PRESETS.map((p) => {
+              const active = resWNum === p.w && resHNum === p.h
+              return (
+                <Button
+                  key={p.label}
+                  type="button"
+                  size="sm"
+                  variant={active ? 'default' : 'outline'}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => pickPreset(p.w, p.h)}
+                >
+                  {p.label}
+                </Button>
+              )
+            })}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="resw">Ancho</Label>
+              <Input
+                id="resw"
+                inputMode="numeric"
+                value={resW}
+                aria-invalid={!resValid}
+                onChange={(e) => setResW(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="resh">Alto</Label>
+              <Input
+                id="resh"
+                inputMode="numeric"
+                value={resH}
+                aria-invalid={!resValid}
+                onChange={(e) => setResH(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="fov">FOV</Label>
+              <Input
+                id="fov"
+                inputMode="decimal"
+                value={fov}
+                aria-invalid={!fovValid}
+                onChange={(e) => setFov(e.target.value)}
+              />
+            </div>
+          </div>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Poné la misma resolución que usás en CS2 (incluida stretched 4:3). FOV por defecto es 90
+            (Source hor+). El inicio del recoil (0,0) queda en el centro; no se estira el patrón para
+            “que entre”.
+          </p>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Desactivá la aceleración del mouse del sistema. El simulador pide movimiento sin ajustes al
+          capturar el puntero, pero no todos los navegadores lo respetan.
         </p>
 
         <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
@@ -135,7 +246,7 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={apply} disabled={!sensValid || !dpiValid}>
+          <Button onClick={apply} disabled={!formValid}>
             Guardar
           </Button>
         </DialogFooter>
