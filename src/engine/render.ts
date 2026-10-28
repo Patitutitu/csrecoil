@@ -1,5 +1,9 @@
+import { HITBOX } from '@/lib/transfer'
+import type { ChartNote, StrafeChart } from '@/lib/strafeChart'
 import type { SprayEngine } from './sprayEngine'
-import type { HitGrade, Vec2 } from './types'
+import type { StrafeEngine } from './strafeEngine'
+import type { HitGrade, RunResult, TracePoint, Vec2 } from './types'
+import { ACCURATE_SPEED_FRACTION } from './movement'
 
 export const GRADE_COLORS: Record<HitGrade, string> = {
   perfect: '#22d3ee',
@@ -30,6 +34,7 @@ export interface Judgment {
   grade: HitGrade
   t: number
   combo: number
+  label?: string
 }
 
 export interface Frame {
@@ -43,6 +48,21 @@ export interface Frame {
   pulses: Pulse[]
   judgments: Judgment[]
   reveal: boolean
+  ghost?: RunResult | null
+  speedFrac?: number
+  keys?: { a: boolean; d: boolean }
+}
+
+export interface StrafeFrame {
+  ctx: CanvasRenderingContext2D
+  width: number
+  height: number
+  now: number
+  engine: StrafeEngine
+  pulses: Pulse[]
+  judgments: Judgment[]
+  speedFrac: number
+  keys: { a: boolean; d: boolean }
 }
 
 export interface Viewport {
@@ -54,11 +74,16 @@ export interface Viewport {
 export function computeViewport(width: number, height: number, path: Vec2[]): Viewport {
   let maxDown = 0
   let maxSide = 0
+  let minY = 0
+  let maxY = 0
   for (const p of path) {
     maxDown = Math.max(maxDown, -p.y)
     maxSide = Math.max(maxSide, Math.abs(p.x))
+    minY = Math.min(minY, p.y)
+    maxY = Math.max(maxY, p.y)
   }
-  const spanY = Math.max(maxDown * 1.15, 3)
+  // Transfer: offsets en y=0, path puede ir más ancho
+  const spanY = Math.max(maxDown * 1.15, Math.max(maxY - minY, 3) * 1.1, 3)
   const spanX = Math.max(maxSide * 1.35, 2.5)
   const padTop = height * 0.14
   const padBottom = height * 0.1
@@ -81,8 +106,16 @@ export function drawFrame(f: Frame): void {
   const finished = engine.status === 'finished'
   const showGuide = f.reveal || f.guideAlpha > 0.001
 
+  if (engine.game === 'transfer') {
+    drawTargets(ctx, view, engine)
+  }
+
   if (showGuide) {
     drawPath(ctx, view, engine, f.reveal ? 1 : f.guideAlpha, now)
+  }
+
+  if (f.ghost && engine.game === 'recoil') {
+    drawGhost(ctx, view, f.ghost.trace, engine.t0, now, engine.status)
   }
 
   drawJudgedNodes(ctx, view, engine)
@@ -90,6 +123,9 @@ export function drawFrame(f: Frame): void {
   if (finished || f.reveal) {
     drawTrace(ctx, view, engine)
     drawErrorLinks(ctx, view, engine)
+    if (engine.game === 'transfer' || engine.game === 'recoil') {
+      drawImpacts(ctx, view, engine)
+    }
   }
 
   drawPulses(ctx, view, f.pulses, now)
@@ -103,9 +139,44 @@ export function drawFrame(f: Frame): void {
   }
 
   const playerPos = engine.status === 'idle' ? { x: 0, y: 0 } : engine.pos
-  drawCrosshair(ctx, toScreen(view, playerPos), running)
+  const accurate = (f.speedFrac ?? 0) <= ACCURATE_SPEED_FRACTION
+  drawCrosshair(ctx, toScreen(view, playerPos), running, accurate)
 
   drawHud(ctx, width, height, engine, f.judgments, now)
+  if (f.keys) drawKeyHud(ctx, width, height, f.keys, f.speedFrac ?? 0)
+}
+
+export function drawStrafeFrame(f: StrafeFrame): void {
+  const { ctx, width, height, engine, now } = f
+  drawBackgroundFlat(ctx, width, height)
+  const rel = engine.status === 'idle' ? 0 : now - engine.t0
+  drawStrafeHighway(ctx, width, height, engine.chart, rel, engine)
+  drawSpeedBar(ctx, width, height, f.speedFrac)
+  drawKeyHud(ctx, width, height, f.keys, f.speedFrac)
+  drawStrafeHud(ctx, width, height, engine, f.judgments, now)
+
+  // Mini spray del burst activo en la esquina
+  if (engine.burst && engine.burst.status !== 'idle') {
+    const mini: Frame = {
+      ctx,
+      width: Math.min(280, width * 0.35),
+      height: Math.min(200, height * 0.35),
+      now,
+      engine: engine.burst,
+      guideAlpha: 1,
+      pulses: f.pulses,
+      judgments: [],
+      reveal: engine.burst.status === 'finished',
+      speedFrac: f.speedFrac,
+    }
+    ctx.save()
+    ctx.translate(width - mini.width - 12, height - mini.height - 48)
+    ctx.beginPath()
+    ctx.rect(0, 0, mini.width, mini.height)
+    ctx.clip()
+    drawFrame(mini)
+    ctx.restore()
+  }
 }
 
 function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, view: Viewport): void {
@@ -115,7 +186,6 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, vie
   ctx.fillStyle = g
   ctx.fillRect(0, 0, w, h)
 
-  // grilla de 1°
   ctx.save()
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.07)'
   ctx.lineWidth = 1
@@ -126,13 +196,11 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, vie
     for (let y = view.anchor.y; y < h; y += step) line(ctx, 0, y, w, y)
     for (let y = view.anchor.y - step; y > 0; y -= step) line(ctx, 0, y, w, y)
   }
-  // ejes del ancla
   ctx.strokeStyle = 'rgba(148, 163, 184, 0.18)'
   line(ctx, view.anchor.x, 0, view.anchor.x, h)
   line(ctx, 0, view.anchor.y, w, view.anchor.y)
   ctx.restore()
 
-  // referencia de escala
   ctx.save()
   ctx.fillStyle = 'rgba(148, 163, 184, 0.55)'
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif'
@@ -146,6 +214,43 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, vie
   ctx.restore()
 }
 
+function drawBackgroundFlat(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const g = ctx.createLinearGradient(0, 0, 0, h)
+  g.addColorStop(0, '#121526')
+  g.addColorStop(1, '#08090f')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, w, h)
+}
+
+function drawTargets(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEngine): void {
+  ctx.save()
+  engine.targets.forEach((t, i) => {
+    const c = toScreen(view, t)
+    const killed = engine.hits[i] >= 4
+    const active = i === engine.currentTarget && engine.status === 'running'
+    const chestW = HITBOX.chestHalfWidth * view.ppd
+    const top = HITBOX.chestTop * view.ppd
+    const bot = -HITBOX.chestBottom * view.ppd
+    ctx.strokeStyle = killed ? 'rgba(34, 211, 238, 0.85)' : active ? '#f472b6' : 'rgba(244, 114, 182, 0.45)'
+    ctx.fillStyle = killed ? 'rgba(34, 211, 238, 0.12)' : active ? 'rgba(244, 114, 182, 0.12)' : 'rgba(244, 114, 182, 0.05)'
+    ctx.lineWidth = active ? 2.5 : 1.5
+    roundRect(ctx, c.x - chestW, c.y - top, chestW * 2, top + bot, 4)
+    ctx.fill()
+    ctx.stroke()
+    // cabeza
+    const hr = HITBOX.headR * view.ppd
+    ctx.beginPath()
+    ctx.arc(c.x, c.y - HITBOX.headY * view.ppd, hr, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.fillStyle = killed ? '#22d3ee' : 'rgba(226,232,240,0.8)'
+    ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'bottom'
+    ctx.fillText(`${engine.hits[i]}/4`, c.x, c.y - top - hr - 6)
+  })
+  ctx.restore()
+}
+
 function drawPath(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEngine, alpha: number, now: number): void {
   const pts = engine.path.map((p) => toScreen(view, p))
   ctx.save()
@@ -153,16 +258,13 @@ function drawPath(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEn
   ctx.lineJoin = 'round'
   ctx.lineCap = 'round'
 
-  // halo
   ctx.strokeStyle = 'rgba(167, 139, 250, 0.25)'
   ctx.lineWidth = 8
   polyline(ctx, pts)
-  // trazo
   ctx.strokeStyle = PATH
   ctx.lineWidth = 2
   polyline(ctx, pts)
 
-  // nodos futuros
   const nextIndex = engine.status === 'running' ? engine.nextIndex : engine.status === 'idle' ? 0 : engine.bullets
   const upcoming = engine.status === 'running' ? nextIndex : -1
   for (let i = 0; i < pts.length; i++) {
@@ -185,6 +287,32 @@ function drawPath(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEn
   ctx.restore()
 }
 
+function drawGhost(
+  ctx: CanvasRenderingContext2D,
+  view: Viewport,
+  trace: TracePoint[],
+  t0: number,
+  now: number,
+  status: SprayEngine['status'],
+): void {
+  if (trace.length < 2) return
+  ctx.save()
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.55)'
+  ctx.lineWidth = 1.5
+  ctx.setLineDash([4, 4])
+  ctx.beginPath()
+  const limit = status === 'running' ? now - t0 : Infinity
+  const p0 = toScreen(view, trace[0])
+  ctx.moveTo(p0.x, p0.y)
+  for (let i = 1; i < trace.length; i++) {
+    if (trace[i].t > limit) break
+    const p = toScreen(view, trace[i])
+    ctx.lineTo(p.x, p.y)
+  }
+  ctx.stroke()
+  ctx.restore()
+}
+
 function drawJudgedNodes(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEngine): void {
   ctx.save()
   for (const s of engine.shots) {
@@ -196,6 +324,17 @@ function drawJudgedNodes(ctx: CanvasRenderingContext2D, view: Viewport, engine: 
     ctx.lineWidth = 1.5
     ctx.strokeStyle = 'rgba(10, 11, 18, 0.9)'
     ctx.stroke()
+  }
+  ctx.restore()
+}
+
+function drawImpacts(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayEngine): void {
+  ctx.save()
+  for (const s of engine.shots) {
+    const p = toScreen(view, s.impact)
+    ctx.fillStyle = GRADE_COLORS[s.grade]
+    ctx.globalAlpha = 0.85
+    ctx.fillRect(p.x - 3, p.y - 3, 6, 6)
   }
   ctx.restore()
 }
@@ -263,7 +402,6 @@ function drawLaser(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayE
   ctx.save()
   ctx.globalAlpha = alpha
 
-  // cometa: últimos 90 ms de trayectoria ideal
   ctx.lineCap = 'round'
   const steps = 10
   let prev = ideal
@@ -277,7 +415,6 @@ function drawLaser(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayE
     prev = p
   }
 
-  // haz vertical desde arriba (efecto láser)
   const beam = ctx.createLinearGradient(ideal.x, 0, ideal.x, ideal.y)
   beam.addColorStop(0, 'rgba(232, 121, 249, 0)')
   beam.addColorStop(1, 'rgba(232, 121, 249, 0.35)')
@@ -285,7 +422,6 @@ function drawLaser(ctx: CanvasRenderingContext2D, view: Viewport, engine: SprayE
   ctx.lineWidth = 1.5
   line(ctx, ideal.x, 0, ideal.x, ideal.y)
 
-  // punto
   const glow = ctx.createRadialGradient(ideal.x, ideal.y, 0, ideal.x, ideal.y, 22)
   glow.addColorStop(0, 'rgba(232, 121, 249, 0.9)')
   glow.addColorStop(1, 'rgba(232, 121, 249, 0)')
@@ -318,9 +454,9 @@ function drawPulses(ctx: CanvasRenderingContext2D, view: Viewport, pulses: Pulse
   ctx.restore()
 }
 
-function drawCrosshair(ctx: CanvasRenderingContext2D, p: Vec2, running: boolean): void {
+function drawCrosshair(ctx: CanvasRenderingContext2D, p: Vec2, running: boolean, accurate = true): void {
   ctx.save()
-  ctx.strokeStyle = CROSSHAIR
+  ctx.strokeStyle = accurate ? CROSSHAIR : '#fb7185'
   ctx.lineWidth = 2
   ctx.shadowColor = 'rgba(0,0,0,0.9)'
   ctx.shadowBlur = 2
@@ -331,7 +467,7 @@ function drawCrosshair(ctx: CanvasRenderingContext2D, p: Vec2, running: boolean)
   line(ctx, p.x, p.y - gap - len, p.x, p.y - gap)
   line(ctx, p.x, p.y + gap, p.x, p.y + gap + len)
   if (running) {
-    ctx.fillStyle = CROSSHAIR
+    ctx.fillStyle = accurate ? CROSSHAIR : '#fb7185'
     ctx.fillRect(p.x - 1, p.y - 1, 2, 2)
   }
   ctx.restore()
@@ -348,42 +484,206 @@ function drawHud(
   ctx.save()
   ctx.textBaseline = 'top'
 
-  // contador de balas
   const fired = engine.status === 'idle' ? 0 : engine.shots.length
   ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif'
   ctx.fillStyle = 'rgba(226, 232, 240, 0.8)'
   ctx.textAlign = 'right'
   ctx.fillText(`${fired} / ${engine.bullets}`, w - 16, 14)
 
-  // combo
+  if (engine.game === 'transfer' && engine.status !== 'idle') {
+    ctx.fillStyle = 'rgba(244, 114, 182, 0.9)'
+    ctx.fillText(`${engine.hits.filter((h) => h >= 4).length}/${engine.targets.length} kills`, w - 16, 34)
+  }
+
   if (engine.status !== 'idle' && engine.combo >= 2) {
+    const y = engine.game === 'transfer' ? 54 : 34
+    ctx.font = '800 28px ui-sans-serif, system-ui, sans-serif'
+    ctx.fillStyle = '#f8fafc'
+    ctx.fillText(`x${engine.combo}`, w - 16, y)
+    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.9)'
+    ctx.fillText('COMBO', w - 16, y + 32)
+  }
+
+  drawJudgmentPop(ctx, w, judgments, now)
+  ctx.restore()
+}
+
+function drawJudgmentPop(ctx: CanvasRenderingContext2D, w: number, judgments: Judgment[], now: number): void {
+  const last = judgments[judgments.length - 1]
+  if (!last) return
+  const age = now - last.t
+  const life = 520
+  if (age < 0 || age >= life) return
+  const k = age / life
+  const scale = 1 + 0.35 * Math.max(0, 1 - age / 120)
+  ctx.save()
+  ctx.globalAlpha = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1
+  ctx.translate(w / 2, 22)
+  ctx.scale(scale, scale)
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.font = '900 26px ui-sans-serif, system-ui, sans-serif'
+  ctx.fillStyle = GRADE_COLORS[last.grade]
+  ctx.shadowColor = 'rgba(0,0,0,0.8)'
+  ctx.shadowBlur = 8
+  ctx.fillText(last.label ?? GRADE_LABELS[last.grade], 0, 0)
+  ctx.restore()
+}
+
+function drawKeyHud(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  keys: { a: boolean; d: boolean },
+  speedFrac: number,
+): void {
+  const accurate = speedFrac <= ACCURATE_SPEED_FRACTION
+  const box = (label: string, on: boolean, x: number) => {
+    ctx.fillStyle = on ? (label === 'A' ? 'rgba(56,189,248,0.35)' : 'rgba(251,146,60,0.35)') : 'rgba(255,255,255,0.06)'
+    ctx.strokeStyle = on ? (label === 'A' ? '#38bdf8' : '#fb923c') : 'rgba(255,255,255,0.15)'
+    ctx.lineWidth = 2
+    roundRect(ctx, x, h - 52, 44, 36, 8)
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = on ? '#fff' : 'rgba(255,255,255,0.45)'
+    ctx.font = '800 16px ui-sans-serif, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, x + 22, h - 34)
+  }
+  ctx.save()
+  box('A', keys.a, w / 2 - 52)
+  box('D', keys.d, w / 2 + 8)
+  ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif'
+  ctx.fillStyle = accurate ? '#4ade80' : '#fb7185'
+  ctx.textAlign = 'center'
+  ctx.fillText(accurate ? 'QUIETO · PRECISIÓN' : 'EN MOVIMIENTO · DISPERSIÓN', w / 2, h - 58)
+  ctx.restore()
+}
+
+function drawSpeedBar(ctx: CanvasRenderingContext2D, w: number, _h: number, speedFrac: number): void {
+  const bw = Math.min(220, w * 0.4)
+  const x = (w - bw) / 2
+  const y = 16
+  ctx.save()
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'
+  roundRect(ctx, x, y, bw, 10, 5)
+  ctx.fill()
+  const fill = Math.min(1, speedFrac) * bw
+  ctx.fillStyle = speedFrac > ACCURATE_SPEED_FRACTION ? '#fb7185' : '#4ade80'
+  roundRect(ctx, x, y, fill, 10, 5)
+  ctx.fill()
+  // umbral 34%
+  const tx = x + ACCURATE_SPEED_FRACTION * bw
+  ctx.fillStyle = '#f8fafc'
+  ctx.fillRect(tx - 1, y - 2, 2, 14)
+  ctx.font = '10px ui-sans-serif, system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('34%', tx, y + 22)
+  ctx.restore()
+}
+
+function drawStrafeHighway(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  chart: StrafeChart,
+  rel: number,
+  engine: StrafeEngine,
+): void {
+  const hitY = h * 0.72
+  const pxPerMs = h / 2800
+  const lanes = {
+    a: w * 0.28,
+    fire: w * 0.5,
+    d: w * 0.72,
+  }
+  const laneW = Math.min(72, w * 0.12)
+
+  ctx.save()
+  // líneas de carril
+  ctx.strokeStyle = 'rgba(148,163,184,0.15)'
+  for (const x of Object.values(lanes)) line(ctx, x, 40, x, h - 60)
+  // línea de golpe
+  ctx.strokeStyle = 'rgba(248,250,252,0.55)'
+  ctx.lineWidth = 2
+  line(ctx, w * 0.15, hitY, w * 0.85, hitY)
+  ctx.fillStyle = 'rgba(248,250,252,0.7)'
+  ctx.font = '11px ui-sans-serif, system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('AHORA', w * 0.15, hitY - 6)
+
+  const drawNote = (n: ChartNote) => {
+    const y1 = hitY - (n.start - rel) * pxPerMs
+    const y2 = hitY - (n.end - rel) * pxPerMs
+    if (y2 > h + 40 || y1 < -40) return
+    if (n.kind === 'hold') {
+      const x = lanes[n.key]
+      const top = Math.min(y1, y2)
+      const bot = Math.max(y1, y2)
+      const past = rel > n.end
+      const active = rel >= n.start && rel <= n.end
+      ctx.fillStyle = past
+        ? 'rgba(148,163,184,0.25)'
+        : n.key === 'a'
+          ? active
+            ? 'rgba(56,189,248,0.75)'
+            : 'rgba(56,189,248,0.45)'
+          : active
+            ? 'rgba(251,146,60,0.75)'
+            : 'rgba(251,146,60,0.45)'
+      roundRect(ctx, x - laneW / 2, top, laneW, Math.max(12, bot - top), 8)
+      ctx.fill()
+      ctx.fillStyle = '#fff'
+      ctx.font = '800 18px ui-sans-serif, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(n.key.toUpperCase(), x, (top + bot) / 2)
+    } else {
+      const x = lanes.fire
+      const top = Math.min(y1, y2)
+      const bot = Math.max(y1, y2)
+      const wstate = engine.windows[n.window]
+      const done = wstate?.judged
+      ctx.fillStyle = done ? 'rgba(34,211,238,0.25)' : 'rgba(232,121,249,0.4)'
+      roundRect(ctx, x - laneW / 2, top, laneW, Math.max(16, bot - top), 8)
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(232,121,249,0.9)'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.fillStyle = '#fdf4ff'
+      ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(`FIRE ×${n.bullets}`, x, (top + bot) / 2)
+    }
+  }
+
+  for (const n of chart.notes) drawNote(n)
+  ctx.restore()
+}
+
+function drawStrafeHud(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  _h: number,
+  engine: StrafeEngine,
+  judgments: Judgment[],
+  now: number,
+): void {
+  ctx.save()
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'top'
+  ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif'
+  ctx.fillStyle = 'rgba(226,232,240,0.85)'
+  ctx.fillText(`${engine.shots.length}/${engine.plannedBullets}`, w - 16, 14)
+  if (engine.combo >= 2) {
     ctx.font = '800 28px ui-sans-serif, system-ui, sans-serif'
     ctx.fillStyle = '#f8fafc'
     ctx.fillText(`x${engine.combo}`, w - 16, 34)
-    ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.9)'
-    ctx.fillText('COMBO', w - 16, 66)
   }
-
-  // última calificación con pop
-  const last = judgments[judgments.length - 1]
-  if (last) {
-    const age = now - last.t
-    const life = 520
-    if (age >= 0 && age < life) {
-      const k = age / life
-      const scale = 1 + 0.35 * Math.max(0, 1 - age / 120)
-      ctx.globalAlpha = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1
-      ctx.translate(w / 2, 22)
-      ctx.scale(scale, scale)
-      ctx.textAlign = 'center'
-      ctx.font = '900 26px ui-sans-serif, system-ui, sans-serif'
-      ctx.fillStyle = GRADE_COLORS[last.grade]
-      ctx.shadowColor = 'rgba(0,0,0,0.8)'
-      ctx.shadowBlur = 8
-      ctx.fillText(GRADE_LABELS[last.grade], 0, 0)
-    }
-  }
+  drawJudgmentPop(ctx, w, judgments, now)
   ctx.restore()
 }
 
@@ -400,4 +700,15 @@ function polyline(ctx: CanvasRenderingContext2D, pts: Vec2[]): void {
   ctx.moveTo(pts[0].x, pts[0].y)
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
   ctx.stroke()
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  const rr = Math.min(r, w / 2, h / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + rr, y)
+  ctx.arcTo(x + w, y, x + w, y + h, rr)
+  ctx.arcTo(x + w, y + h, x, y + h, rr)
+  ctx.arcTo(x, y + h, x, y, rr)
+  ctx.arcTo(x, y, x + w, y, rr)
+  ctx.closePath()
 }

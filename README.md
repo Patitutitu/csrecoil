@@ -1,9 +1,10 @@
 # Recoil Rhythm · entrenador de control de recoil de CS2
 
-Juego web estilo "de ritmo" para practicar el control de spray de los rifles de CS2 sin disparos ni objetivos: un láser recorre la trayectoria de compensación con la **cadencia real del arma**, vos la seguís con el mouse y cada bala se califica por el error angular entre tu mira y el punto ideal.
+Juego web estilo "de ritmo" para practicar el control de spray de CS2 con la **cadencia real del arma**. Tres minijuegos basados en reglas del juego: Spray, Spray Transfer y Strafe A/D (estilo Guitar Hero).
 
-- **La cadencia es sagrada.** La AK-47 dispara cada 100 ms (600 RPM), la M4A4 cada 90 ms (667 RPM), la SG 553 cada 110 ms (545 RPM)... No hay modo lento ni ajuste de velocidad: el ritmo se adapta al arma, no al revés.
-- **Todo se mide en grados.** Los patrones son offsets angulares por bala (pitch/yaw). Con tu sensibilidad de CS2 (`sens × 0.022°` por count) el movimiento que hacés en el mousepad es exactamente el que harías en el juego.
+- **La cadencia es sagrada.** La AK-47 dispara cada 100 ms (600 RPM), la M4A4 cada 90 ms (667 RPM)... No hay modo lento: el ritmo se adapta al arma.
+- **Todo se mide en grados.** Con tu sensibilidad de CS2 (`sens × 0.022°` por count) el movimiento del mousepad es el mismo que en el juego.
+- **Disparar en movimiento falla.** Por encima del 34 % de la velocidad máxima del arma aparece dispersión (como en CS2). Frená con counter-strafe (tecla opuesta) antes de tirar.
 
 ## Cómo correrlo
 
@@ -18,33 +19,30 @@ Requiere un navegador de escritorio con mouse. Chrome/Edge usan `pointerrawupdat
 
 ## Cómo se juega
 
-1. Elegí arma (rifles, subfusiles o M249; `1`–`9` para las primeras), ejercicio (`Q` 4 balas, `W` 9 balas, `E` cargador completo) y nivel de guía (`G`: Guiado → Fade → Ciego).
-2. Click en el área de juego para capturar el mouse. En **Ajustes** cargá tu sensibilidad y DPI reales.
-3. Mantené el click izquierdo: la primera bala sale al instante y el resto a la cadencia del arma. Seguí el láser con la mira; soltá para cortar la ráfaga como en el juego.
-4. Cada bala recibe **Perfecto (≤ 0,3°) / Genial (≤ 0,6°) / Bien (≤ 1,0°) / Fallo**, con combo que multiplica hasta x2. Al terminar ves tu recorrido superpuesto al ideal, el error por bala y la nota (S/A/B/C/D).
-5. `R` repite, `M` silencia, `Espacio` reproduce el ritmo del arma sin jugar.
+1. Elegí **minijuego** (`Tab`), arma (`1`–`9`), ejercicio (`Q`/`W`/`E`) y guía (`G`).
+2. Click para capturar el mouse. **Click derecho** (o Esc) lo libera. En Ajustes cargá tu sens y DPI.
+3. **Spray**: mantené click izquierdo y seguí el láser. Cada bala perfecta en el instante del disparo pega en (0,0).
+4. **Transfer**: 4 impactos al pecho por objetivo en línea (`y = 0`). Mové en X sin perder altura.
+5. **Strafe**: partitura A/D (notas sostenidas) + ventanas FIRE. Solo dispará quieto (≤34 % velocidad).
+6. El panel **Coach** te dice si bajás muy rápido/lento, el sesgo en cm/counts y en qué tramo fallás.
+7. Desafío diario (mismo seed para todos), racha, CS Practice Rating, fantasma del récord y calentamiento de 60 s.
 
-Niveles de guía:
-
-- **Guiado**: camino completo, nodos numerados y láser visibles toda la ráfaga.
-- **Fade**: la guía se apaga durante el primer tramo de la ráfaga; el resto va de memoria.
-- **Ciego**: solo el metrónomo y las calificaciones; el patrón se revela al final.
-
-El historial y las estadísticas por bala se guardan en `localStorage` del navegador. No hay backend ni cuentas.
+Atajos: `R` reinicia · `M` mute · `Espacio` preview · `A`/`D` strafe · click derecho libera.
 
 ## Estructura
 
 ```
 src/
-  data/weapons.ts        patrones y cadencia por arma (grados)
-  engine/types.ts        tipos compartidos
-  engine/sprayEngine.ts  línea de tiempo de la ráfaga, muestreo del mouse y calificación por bala
-  engine/scoring.ts      umbrales, puntos, combo y nota
-  engine/audio.ts        metrónomo con Web Audio (agendado en el reloj de audio), hit sounds, bombo
-  engine/render.ts       dibujo del canvas: camino, láser, pulsos, mira, HUD, overlay de resultados
-  lib/units.ts           grados ↔ counts ↔ cm, BPM equivalente, trayectoria de compensación
-  store/storage.ts       ajustes, historial y estadísticas en localStorage
-  components/            PlayArea (canvas + pointer lock), Controls, WeaponInfo, ResultsPanel, StatsPanel, SettingsDialog
+  data/weapons.ts          patrones, cadencia y maxSpeed por arma
+  engine/sprayEngine.ts    ráfaga, impactos en el mundo, transfer, dispersión por movimiento
+  engine/strafeEngine.ts   partitura A/D + ventanas de disparo quieto
+  engine/movement.ts       física Source (friction/accelerate) a 64 tick
+  engine/coach.ts          timing, sesgos y tips en cm/counts
+  engine/rating.ts         CS Practice Rating, racha, tiers
+  engine/render.ts         spray, objetivos, highway tipo Guitar Hero
+  lib/strafeChart.ts       notas AAAAAAAAA / DDDDDDDDD
+  lib/transfer.ts          hitboxes de pecho/cabeza y seeds de objetivos
+  components/              PlayArea, Controls, ResultsPanel (Coach), MetaPanel, …
 ```
 
 ## Datos
@@ -86,4 +84,4 @@ Si Valve ajusta un patrón, basta con reemplazar el vector del arma en ese archi
 
 ## Fuera de alcance (por ahora)
 
-Modo lento (a propósito), objetivos/disparos, multijugador, backend, la SG 553 con mira y M4A1-S sin silenciador: no hay una fuente en grados para esos patrones.
+Modo lento (a propósito), multijugador online, backend, cuentas, la SG 553 con mira y M4A1-S sin silenciador.

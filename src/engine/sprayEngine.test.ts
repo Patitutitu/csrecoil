@@ -5,11 +5,13 @@ import { comboMultiplier, gradeForError, summarize } from './scoring'
 import { SprayEngine } from './sprayEngine'
 
 describe('datos de armas', () => {
-  it('cada arma tiene cadencia real y patrón completo', () => {
+  it('cada arma tiene cadencia real, patrón completo y velocidad máxima', () => {
     for (const w of WEAPONS) {
       expect(Math.round(60000 / w.cycleMs)).toBeCloseTo(w.rpm, -1)
       expect(w.pattern.length).toBe(w.magazine)
       expect(w.pattern[0]).toEqual({ x: 0, y: 0 })
+      expect(w.maxSpeed).toBeGreaterThan(180)
+      expect(w.maxSpeed).toBeLessThanOrEqual(250)
     }
   })
 
@@ -145,10 +147,29 @@ describe('SprayEngine', () => {
     }
     expect(e.status).toBe('finished')
     expect(e.result?.completed).toBe(true)
+    expect(e.result?.game).toBe('recoil')
     expect(e.result?.shots.every((s) => s.grade === 'perfect')).toBe(true)
+    expect(e.result?.shots.every((s) => Math.hypot(s.impact.x, s.impact.y) < 0.01)).toBe(true)
     expect(e.result?.grade).toBe('S')
     expect(e.result?.accuracy).toBeCloseTo(1)
     expect(e.result?.maxCombo).toBe(9)
+  })
+
+  it('spray transfer pone objetivos en X y pide 4 balas por pecho', () => {
+    const e = new SprayEngine({
+      weapon: WEAPON_BY_ID.ak47,
+      mode: 't2',
+      guide: 'guided',
+      sensitivity: 1,
+      dpi: 800,
+      game: 'transfer',
+      seed: 1,
+    })
+    expect(e.bullets).toBe(8)
+    expect(e.targets).toHaveLength(2)
+    expect(e.targets[0].y).toBe(0)
+    expect(e.offsets[0]).toEqual(e.targets[0])
+    expect(e.offsets[4]).toEqual(e.targets[1])
   })
 
   it('no mover el mouse en el cargador completo falla casi todas las balas', () => {

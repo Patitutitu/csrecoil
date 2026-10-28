@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Crosshair, Volume2, VolumeX } from 'lucide-react'
 import { Controls } from '@/components/Controls'
+import { MetaPanel } from '@/components/MetaPanel'
 import { PlayArea } from '@/components/PlayArea'
 import { ResultsPanel } from '@/components/ResultsPanel'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -10,8 +11,9 @@ import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { WEAPONS } from '@/data/weapons'
 import { audioEngine } from '@/engine/audio'
-import type { DrillMode, GuideLevel, RunResult, WeaponDef } from '@/engine/types'
-import { GUIDES, MODES } from '@/lib/drills'
+import type { DrillMode, GameId, GuideLevel, RecoilMode, RunResult, WeaponDef } from '@/engine/types'
+import { defaultMode, GAMES, GUIDES, modesForGame } from '@/lib/drills'
+import { dailyChallenge, utcDayKey } from '@/lib/daily'
 import { bulletsForMode } from '@/lib/units'
 import { bestRun, useHistory, useSettings } from '@/store/storage'
 
@@ -21,6 +23,9 @@ interface SessionState {
   weaponId: string
   mode: DrillMode
   guide: GuideLevel
+  game: GameId
+  seed?: number
+  daily?: string
 }
 
 function readSession(): SessionState {
@@ -28,16 +33,39 @@ function readSession(): SessionState {
     const raw = localStorage.getItem(SESSION_KEY)
     if (raw) {
       const s = JSON.parse(raw) as Partial<SessionState>
+      const game = GAMES.some((g) => g.id === s.game) ? (s.game as GameId) : 'recoil'
+      const modes = modesForGame(game)
       return {
         weaponId: WEAPONS.some((w) => w.id === s.weaponId) ? (s.weaponId as string) : WEAPONS[0].id,
-        mode: MODES.some((m) => m.id === s.mode) ? (s.mode as DrillMode) : 'first4',
+        mode: modes.some((m) => m.id === s.mode) ? (s.mode as DrillMode) : modes[0].id,
         guide: GUIDES.some((g) => g.id === s.guide) ? (s.guide as GuideLevel) : 'guided',
+        game,
+        seed: typeof s.seed === 'number' ? s.seed : undefined,
+        daily: typeof s.daily === 'string' ? s.daily : undefined,
       }
     }
   } catch {
     // sin sesión previa
   }
-  return { weaponId: WEAPONS[0].id, mode: 'first4', guide: 'guided' }
+  // Challenge link ?d=YYYY-MM-DD
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const day = params.get('d')
+    if (day) {
+      const c = dailyChallenge(day)
+      return {
+        weaponId: c.weaponId,
+        mode: c.mode,
+        guide: c.guide,
+        game: c.game,
+        seed: c.seed,
+        daily: c.day,
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return { weaponId: WEAPONS[0].id, mode: 'first4', guide: 'guided', game: 'recoil' }
 }
 
 export default function App() {
@@ -47,9 +75,10 @@ export default function App() {
   const [retryToken, setRetryToken] = useState(0)
   const [lastResult, setLastResult] = useState<RunResult | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [warmup, setWarmup] = useState<{ steps: SessionState[]; i: number } | null>(null)
 
   const weapon = WEAPONS.find((w) => w.id === session.weaponId) ?? WEAPONS[0]
-  const { mode, guide } = session
+  const { mode, guide, game } = session
 
   useEffect(() => {
     try {
@@ -63,17 +92,94 @@ export default function App() {
     setSession(fn)
     setLastResult(null)
   }, [])
-  const setWeapon = useCallback((w: WeaponDef) => patchSession((s) => ({ ...s, weaponId: w.id })), [patchSession])
-  const setMode = useCallback((m: DrillMode) => patchSession((s) => ({ ...s, mode: m })), [patchSession])
-  const setGuide = useCallback((g: GuideLevel) => patchSession((s) => ({ ...s, guide: g })), [patchSession])
+
+  const setWeapon = useCallback(
+    (w: WeaponDef) => patchSession((s) => ({ ...s, weaponId: w.id, seed: undefined, daily: undefined })),
+    [patchSession],
+  )
+  const setMode = useCallback(
+    (m: DrillMode) => patchSession((s) => ({ ...s, mode: m, seed: undefined, daily: undefined })),
+    [patchSession],
+  )
+  const setGuide = useCallback(
+    (g: GuideLevel) => patchSession((s) => ({ ...s, guide: g, seed: undefined, daily: undefined })),
+    [patchSession],
+  )
+  const setGame = useCallback(
+    (g: GameId) =>
+      patchSession((s) => ({
+        ...s,
+        game: g,
+        mode: defaultMode(g),
+        seed: undefined,
+        daily: undefined,
+      })),
+    [patchSession],
+  )
 
   const onFinished = useCallback(
     (r: RunResult) => {
       setLastResult(r)
       addRun(r)
+      if (warmup) {
+        const next = warmup.i + 1
+        if (next < warmup.steps.length) {
+          setTimeout(() => {
+            setWarmup({ ...warmup, i: next })
+            setSession(warmup.steps[next])
+            setRetryToken((t) => t + 1)
+            setLastResult(null)
+          }, 900)
+        } else {
+          setWarmup(null)
+        }
+      }
     },
-    [addRun],
+    [addRun, warmup],
   )
+
+  const best = bestRun(history, weapon.id, mode, guide, game)
+  const daily = useMemo(() => dailyChallenge(), [])
+  const dailyDone = history.some(
+    (r) => r.seed === daily.seed && r.game === daily.game && r.weaponId === daily.weaponId && utcDayKey(new Date(r.date)) === daily.day,
+  )
+
+  const playDaily = useCallback(() => {
+    const c = dailyChallenge()
+    setWarmup(null)
+    setSession({
+      weaponId: c.weaponId,
+      mode: c.mode,
+      guide: c.guide,
+      game: c.game,
+      seed: c.seed,
+      daily: c.day,
+    })
+    setRetryToken((t) => t + 1)
+    setLastResult(null)
+  }, [])
+
+  const shareDaily = useCallback(async () => {
+    const url = `${window.location.origin}${window.location.pathname}?d=${daily.day}`
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      // fallback
+      window.prompt('Copiá el link del desafío', url)
+    }
+  }, [daily.day])
+
+  const startWarmup = useCallback(() => {
+    const steps: SessionState[] = [
+      { weaponId: 'ak47', mode: 'first4' as RecoilMode, guide: 'guided', game: 'recoil' },
+      { weaponId: 'm4a4', mode: 'first9' as RecoilMode, guide: 'fade', game: 'recoil' },
+      { weaponId: 'ak47', mode: 't2', guide: 'guided', game: 'transfer' },
+    ]
+    setWarmup({ steps, i: 0 })
+    setSession(steps[0])
+    setRetryToken((t) => t + 1)
+    setLastResult(null)
+  }, [])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -82,6 +188,7 @@ export default function App() {
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const k = e.key.toLowerCase()
+      if (k === 'a' || k === 'd') return // las maneja PlayArea
       if (k >= '1' && k <= '9') {
         const w = WEAPONS[Number(k) - 1]
         if (w) setWeapon(w)
@@ -89,18 +196,26 @@ export default function App() {
       }
       switch (k) {
         case 'q':
-          setMode('first4')
-          break
         case 'w':
-          setMode('first9')
+        case 'e': {
+          const modes = modesForGame(game)
+          const idx = k === 'q' ? 0 : k === 'w' ? 1 : 2
+          if (modes[idx]) setMode(modes[idx].id)
           break
-        case 'e':
-          setMode('full')
+        }
+        case 'tab':
+          e.preventDefault()
+          patchSession((s) => {
+            const i = GAMES.findIndex((g) => g.id === s.game)
+            const next = GAMES[(i + 1) % GAMES.length].id
+            return { ...s, game: next, mode: defaultMode(next), seed: undefined, daily: undefined }
+          })
           break
         case 'g':
+          if (game === 'strafe') break
           patchSession((s) => {
             const i = GUIDES.findIndex((g) => g.id === s.guide)
-            return { ...s, guide: GUIDES[(i + 1) % GUIDES.length].id }
+            return { ...s, guide: GUIDES[(i + 1) % GUIDES.length].id, seed: undefined, daily: undefined }
           })
           break
         case 'r':
@@ -118,9 +233,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settingsOpen, settings.audio, updateSettings, weapon, mode, setWeapon, setMode, patchSession])
-
-  const best = bestRun(history, weapon.id, mode, guide)
+  }, [settingsOpen, settings.audio, updateSettings, weapon, mode, game, setWeapon, setMode, patchSession])
 
   return (
     <TooltipProvider>
@@ -132,7 +245,9 @@ export default function App() {
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-bold tracking-tight">Recoil Rhythm</h1>
-              <p className="truncate text-xs text-white/50">Control de spray de CS2 como juego de ritmo, a la cadencia real</p>
+              <p className="truncate text-xs text-white/50">
+                Spray · Transfer · Strafe A/D · cadencia real de CS2
+              </p>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Button
@@ -143,37 +258,83 @@ export default function App() {
               >
                 {settings.audio ? <Volume2 /> : <VolumeX />}
               </Button>
-              <SettingsDialog settings={settings} onChange={updateSettings} open={settingsOpen} onOpenChange={setSettingsOpen} />
+              <SettingsDialog
+                settings={settings}
+                onChange={updateSettings}
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+              />
             </div>
           </div>
         </header>
 
         <main className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_340px]">
           <section className="flex min-w-0 flex-col gap-4">
+            {warmup && (
+              <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                Calentamiento {warmup.i + 1}/{warmup.steps.length}: terminá la ráfaga para pasar al siguiente ejercicio.
+              </div>
+            )}
+            {session.daily && (
+              <div className="rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-2 text-xs text-fuchsia-100">
+                Desafío del día {session.daily} · mismo seed para todos · Tab cambia de minijuego
+              </div>
+            )}
             <PlayArea
               weapon={weapon}
               mode={mode}
               guide={guide}
+              game={game}
               settings={settings}
               retryToken={retryToken}
+              seed={session.seed}
+              ghost={settings.ghost ? best : null}
               onFinished={onFinished}
             />
             <div className="grid gap-4 md:grid-cols-2">
-              <ResultsPanel result={lastResult} weapon={weapon} best={best} />
+              <ResultsPanel
+                result={lastResult}
+                weapon={weapon}
+                best={best}
+                sensitivity={settings.sensitivity}
+                dpi={settings.dpi}
+              />
               <WeaponInfo weapon={weapon} mode={mode} settings={settings} />
             </div>
           </section>
 
           <aside className="flex flex-col gap-4">
-            <Controls weapon={weapon} mode={mode} guide={guide} onWeapon={setWeapon} onMode={setMode} onGuide={setGuide} />
-            <StatsPanel history={history} weaponId={weapon.id} mode={mode} guide={guide} onClear={clear} />
+            <MetaPanel
+              history={history}
+              onPlayDaily={playDaily}
+              onWarmup={startWarmup}
+              onShare={shareDaily}
+              dailyDone={dailyDone}
+            />
+            <Controls
+              weapon={weapon}
+              mode={mode}
+              guide={guide}
+              game={game}
+              onWeapon={setWeapon}
+              onMode={setMode}
+              onGuide={setGuide}
+              onGame={setGame}
+            />
+            <StatsPanel
+              history={history}
+              weaponId={weapon.id}
+              mode={mode}
+              guide={guide}
+              game={game}
+              onClear={clear}
+            />
           </aside>
         </main>
 
         <footer className="mx-auto max-w-7xl px-4 pb-6 text-[11px] text-white/35">
-          La cadencia de cada arma es la real de CS2 y no se puede modificar: el ritmo se adapta al arma, no al revés.
-          Los patrones provienen de mediciones públicas en grados (ver README). Sin disparos ni objetivos: solo luz,
-          sonido y tu mouse.
+          Cadencia real de CS2 (no se modifica). Disparar por encima del 34 % de velocidad máxima agrega dispersión.
+          Click derecho libera el mouse. Tab: minijuego · Q/W/E: ejercicio · G: guía · R: reiniciar · A/D: strafe.
         </footer>
       </div>
     </TooltipProvider>

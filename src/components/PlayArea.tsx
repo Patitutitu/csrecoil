@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Keyboard, MousePointerClick, TriangleAlert } from 'lucide-react'
 import { audioEngine } from '@/engine/audio'
-import { drawFrame, type Judgment, type Pulse } from '@/engine/render'
+import { drawFrame, drawStrafeFrame, type Judgment, type Pulse } from '@/engine/render'
+import { Movement } from '@/engine/movement'
 import { SprayEngine, type EngineEvent } from '@/engine/sprayEngine'
-import type { DrillMode, GuideLevel, RunResult, Settings, WeaponDef } from '@/engine/types'
+import { StrafeEngine, type StrafeEvent } from '@/engine/strafeEngine'
+import type {
+  DrillMode,
+  GameId,
+  GuideLevel,
+  RunResult,
+  Settings,
+  StrafeMode,
+  WeaponDef,
+} from '@/engine/types'
 import { bpmForCycle, bulletsForMode } from '@/lib/units'
+import { randomSeed } from '@/lib/random'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 
@@ -12,19 +23,16 @@ export interface PlayAreaProps {
   weapon: WeaponDef
   mode: DrillMode
   guide: GuideLevel
+  game: GameId
   settings: Settings
   retryToken: number
+  seed?: number
+  ghost?: RunResult | null
   onFinished: (result: RunResult) => void
 }
 
 type LockState = 'unlocked' | 'locked' | 'fallback'
 type UiStatus = 'idle' | 'running' | 'finished'
-
-const MODE_LABEL: Record<DrillMode, string> = {
-  first4: '4 balas',
-  first9: '9 balas',
-  full: 'Cargador',
-}
 
 function clamp01(n: number): number {
   return n < 0 ? 0 : n > 1 ? 1 : n
@@ -42,43 +50,88 @@ function guideAlphaFor(engine: SprayEngine, now: number): number {
   return clamp01(1 - (progress - fadeStart) / (fadeEnd - fadeStart))
 }
 
-export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished }: PlayAreaProps) {
+export function PlayArea({
+  weapon,
+  mode,
+  guide,
+  game,
+  settings,
+  retryToken,
+  seed: seedProp,
+  ghost,
+  onFinished,
+}: PlayAreaProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const engineRef = useRef<SprayEngine | null>(null)
+  const sprayRef = useRef<SprayEngine | null>(null)
+  const strafeRef = useRef<StrafeEngine | null>(null)
+  const movementRef = useRef<Movement | null>(null)
   const pulsesRef = useRef<Pulse[]>([])
   const judgmentsRef = useRef<Judgment[]>([])
   const lockRef = useRef<LockState>('unlocked')
   const onFinishedRef = useRef(onFinished)
-  const optsRef = useRef({ weapon, mode, guide, sensitivity: settings.sensitivity, dpi: settings.dpi })
+  const seedRef = useRef(seedProp ?? randomSeed())
+  const ghostRef = useRef(ghost)
+  const optsRef = useRef({ weapon, mode, guide, game, sensitivity: settings.sensitivity, dpi: settings.dpi })
 
   const [lockState, setLockState] = useState<LockState>('unlocked')
   const [uiStatus, setUiStatus] = useState<UiStatus>('idle')
   const [lastResult, setLastResult] = useState<RunResult | null>(null)
+  const [, setKeys] = useState({ a: false, d: false })
   const [isTouch] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches
       : false,
   )
 
-  // Se ejecuta antes que el resto de los efectos en cada render: mantiene las refs al día.
   useEffect(() => {
     onFinishedRef.current = onFinished
-    optsRef.current = { weapon, mode, guide, sensitivity: settings.sensitivity, dpi: settings.dpi }
+    ghostRef.current = ghost
+    optsRef.current = { weapon, mode, guide, game, sensitivity: settings.sensitivity, dpi: settings.dpi }
+    if (seedProp !== undefined) seedRef.current = seedProp
   })
 
   const resetEngine = useCallback(() => {
     audioEngine.cancelScheduled()
-    engineRef.current = new SprayEngine(optsRef.current)
+    const o = optsRef.current
+    const seed = seedProp !== undefined ? seedProp : randomSeed()
+    seedRef.current = seed
+    const movement = new Movement(o.weapon.maxSpeed)
+    movementRef.current = movement
+    setKeys({ a: false, d: false })
+    if (o.game === 'strafe') {
+      sprayRef.current = null
+      strafeRef.current = new StrafeEngine({
+        weapon: o.weapon,
+        mode: o.mode as StrafeMode,
+        guide: o.guide,
+        sensitivity: o.sensitivity,
+        dpi: o.dpi,
+        seed,
+        movement,
+      })
+    } else {
+      strafeRef.current = null
+      sprayRef.current = new SprayEngine({
+        weapon: o.weapon,
+        mode: o.mode,
+        guide: o.guide,
+        sensitivity: o.sensitivity,
+        dpi: o.dpi,
+        game: o.game,
+        seed,
+        movement,
+      })
+    }
     pulsesRef.current = []
     judgmentsRef.current = []
     setUiStatus('idle')
     setLastResult(null)
-  }, [])
+  }, [seedProp])
 
   useEffect(() => {
     resetEngine()
-  }, [weapon, mode, guide, settings.sensitivity, settings.dpi, retryToken, resetEngine])
+  }, [weapon, mode, guide, game, settings.sensitivity, settings.dpi, retryToken, seedProp, resetEngine])
 
   useEffect(() => {
     audioEngine.enabled = settings.audio
@@ -91,16 +144,49 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
     setLockState(s)
   }, [])
 
-  const handleEvents = useCallback((events: EngineEvent[], now: number) => {
-    const engine = engineRef.current
-    if (!engine) return
+  const handleSprayEvents = useCallback((events: EngineEvent[], now: number) => {
     for (const ev of events) {
       if (ev.type === 'start') {
         setUiStatus('running')
       } else if (ev.type === 'shot') {
         pulsesRef.current.push({ pos: ev.shot.target, t: now, grade: ev.shot.grade })
-        judgmentsRef.current.push({ grade: ev.shot.grade, t: now, combo: ev.combo })
+        judgmentsRef.current.push({
+          grade: ev.shot.grade,
+          t: now,
+          combo: ev.combo,
+          label: ev.shot.moving ? 'EN MOVIMIENTO' : undefined,
+        })
         audioEngine.playJudgment(ev.shot.grade)
+        if (ev.kill !== null) {
+          judgmentsRef.current.push({ grade: 'perfect', t: now + 1, combo: ev.combo, label: `KILL ${ev.kill + 1}` })
+          audioEngine.playFinish(true)
+        }
+      } else if (ev.type === 'finished') {
+        audioEngine.cancelScheduled()
+        audioEngine.playFinish(ev.result.accuracy >= 0.7)
+        setUiStatus('finished')
+        setLastResult(ev.result)
+        onFinishedRef.current(ev.result)
+      }
+    }
+  }, [])
+
+  const handleStrafeEvents = useCallback((events: StrafeEvent[], now: number) => {
+    for (const ev of events) {
+      if (ev.type === 'start') {
+        setUiStatus('running')
+      } else if (ev.type === 'shot') {
+        if (ev.shot.target) pulsesRef.current.push({ pos: ev.shot.target, t: now, grade: ev.shot.grade })
+        judgmentsRef.current.push({
+          grade: ev.shot.grade,
+          t: now,
+          combo: ev.combo,
+          label: ev.shot.moving ? 'EN MOVIMIENTO' : undefined,
+        })
+        audioEngine.playJudgment(ev.shot.grade)
+      } else if (ev.type === 'pop') {
+        judgmentsRef.current.push({ grade: ev.grade, t: now, combo: strafeRef.current?.combo ?? 0, label: ev.label })
+        audioEngine.playJudgment(ev.grade)
       } else if (ev.type === 'finished') {
         audioEngine.cancelScheduled()
         audioEngine.playFinish(ev.result.accuracy >= 0.7)
@@ -113,30 +199,55 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
 
   const startRun = useCallback(
     (t: number) => {
-      let engine = engineRef.current
+      if (game === 'strafe') {
+        let engine = strafeRef.current
+        if (!engine) return
+        if (engine.status === 'finished') {
+          resetEngine()
+          engine = strafeRef.current as StrafeEngine
+        }
+        audioEngine.ensure()
+        if (engine.status === 'idle') {
+          // La canción arranca con el primer click: agenda ticks al tempo del arma
+          audioEngine.scheduleBurst(t, engine.cycleMs, Math.ceil(engine.chart.durationMs / engine.cycleMs))
+        }
+        handleStrafeEvents(engine.press(t), t)
+        return
+      }
+      let engine = sprayRef.current
       if (!engine) return
       if (engine.status === 'finished') {
         resetEngine()
-        engine = engineRef.current as SprayEngine
+        engine = sprayRef.current as SprayEngine
       }
       if (engine.status !== 'idle') return
       audioEngine.ensure()
       audioEngine.scheduleBurst(t, engine.cycleMs, engine.bullets)
-      handleEvents(engine.press(t), t)
+      handleSprayEvents(engine.press(t), t)
     },
-    [handleEvents, resetEngine],
+    [game, handleSprayEvents, handleStrafeEvents, resetEngine],
   )
 
   const endRun = useCallback(
     (t: number) => {
-      const engine = engineRef.current
+      if (game === 'strafe') {
+        const engine = strafeRef.current
+        if (!engine) return
+        handleStrafeEvents(engine.release(t), t)
+        return
+      }
+      const engine = sprayRef.current
       if (!engine) return
-      handleEvents(engine.release(t), t)
+      handleSprayEvents(engine.release(t), t)
     },
-    [handleEvents],
+    [game, handleSprayEvents, handleStrafeEvents],
   )
 
-  // Entrada: pointer lock + movimiento crudo
+  const unlockMouse = useCallback(() => {
+    if (document.pointerLockElement) document.exitPointerLock()
+  }, [])
+
+  // Entrada: pointer lock + movimiento crudo + click derecho libera
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -169,6 +280,11 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return
+      if (e.button === 2) {
+        e.preventDefault()
+        unlockMouse()
+        return
+      }
       if (e.button !== 0) return
       e.preventDefault()
       audioEngine.ensure()
@@ -185,7 +301,11 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
     }
 
     const onMove = (e: PointerEvent) => {
-      const engine = engineRef.current
+      if (game === 'strafe') {
+        strafeRef.current?.move(e.timeStamp, e.movementX, e.movementY)
+        return
+      }
+      const engine = sprayRef.current
       if (!engine || engine.status !== 'running') return
       engine.move(e.timeStamp, e.movementX, e.movementY)
     }
@@ -195,12 +315,24 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
       if (locked) setLock('locked')
       else {
         if (lockRef.current === 'locked') setLock('unlocked')
-        endRun(performance.now())
+        const t = performance.now()
+        if (game === 'strafe') {
+          const eng = strafeRef.current
+          if (eng?.status === 'running') handleStrafeEvents(eng.abort(t), t)
+        } else {
+          endRun(t)
+        }
+        movementRef.current?.releaseAll(t)
+        setKeys({ a: false, d: false })
       }
     }
     const onLockError = () => setLock('fallback')
     const onVisibility = () => {
-      if (document.hidden) endRun(performance.now())
+      const t = performance.now()
+      if (game === 'strafe') {
+        const eng = strafeRef.current
+        if (eng?.status === 'running') handleStrafeEvents(eng.abort(t), t)
+      } else endRun(t)
     }
     const onContextMenu = (e: Event) => e.preventDefault()
 
@@ -224,9 +356,39 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
       document.removeEventListener('visibilitychange', onVisibility)
       if (document.pointerLockElement === canvas) document.exitPointerLock()
     }
-  }, [startRun, endRun, setLock])
+  }, [startRun, endRun, setLock, unlockMouse, game, handleStrafeEvents])
 
-  // Tamaño del canvas y loop de render
+  // Teclas A/D
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => {
+      if (e.repeat) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      const k = e.key.toLowerCase()
+      if (k !== 'a' && k !== 'd') return
+      e.preventDefault()
+      const m = movementRef.current
+      if (!m) return
+      m.setKey(performance.now(), k, true)
+      setKeys({ a: m.keys.a, d: m.keys.d })
+    }
+    const onUp = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase()
+      if (k !== 'a' && k !== 'd') return
+      const m = movementRef.current
+      if (!m) return
+      m.setKey(performance.now(), k, false)
+      setKeys({ a: m.keys.a, d: m.keys.d })
+    }
+    window.addEventListener('keydown', onDown)
+    window.addEventListener('keyup', onUp)
+    return () => {
+      window.removeEventListener('keydown', onDown)
+      window.removeEventListener('keyup', onUp)
+    }
+  }, [])
+
+  // Loop de render
   useEffect(() => {
     const canvas = canvasRef.current
     const wrapper = wrapperRef.current
@@ -252,23 +414,48 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
     let raf = 0
     const loop = () => {
       const now = performance.now()
-      const engine = engineRef.current
-      if (engine) {
-        handleEvents(engine.update(now), now)
-        pulsesRef.current = pulsesRef.current.filter((p) => now - p.t < 500)
-        if (judgmentsRef.current.length > 6) judgmentsRef.current.splice(0, judgmentsRef.current.length - 6)
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        drawFrame({
-          ctx,
-          width,
-          height,
-          now,
-          engine,
-          guideAlpha: guideAlphaFor(engine, now),
-          pulses: pulsesRef.current,
-          judgments: judgmentsRef.current,
-          reveal: engine.status === 'finished',
-        })
+      movementRef.current?.advance(now)
+      const speedFrac = movementRef.current?.speedFracAt(now) ?? 0
+      const keyState = movementRef.current?.keys ?? { a: false, d: false }
+      pulsesRef.current = pulsesRef.current.filter((p) => now - p.t < 500)
+      if (judgmentsRef.current.length > 8) judgmentsRef.current.splice(0, judgmentsRef.current.length - 8)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+      if (game === 'strafe') {
+        const engine = strafeRef.current
+        if (engine) {
+          handleStrafeEvents(engine.update(now), now)
+          drawStrafeFrame({
+            ctx,
+            width,
+            height,
+            now,
+            engine,
+            pulses: pulsesRef.current,
+            judgments: judgmentsRef.current,
+            speedFrac,
+            keys: keyState,
+          })
+        }
+      } else {
+        const engine = sprayRef.current
+        if (engine) {
+          handleSprayEvents(engine.update(now), now)
+          drawFrame({
+            ctx,
+            width,
+            height,
+            now,
+            engine,
+            guideAlpha: guideAlphaFor(engine, now),
+            pulses: pulsesRef.current,
+            judgments: judgmentsRef.current,
+            reveal: engine.status === 'finished',
+            ghost: settings.ghost ? ghostRef.current : null,
+            speedFrac,
+            keys: keyState,
+          })
+        }
       }
       raf = requestAnimationFrame(loop)
     }
@@ -277,9 +464,10 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
       cancelAnimationFrame(raf)
       ro.disconnect()
     }
-  }, [handleEvents])
+  }, [game, handleSprayEvents, handleStrafeEvents, settings.ghost])
 
   const bullets = bulletsForMode(weapon, mode)
+  const gameLabel = game === 'recoil' ? 'Spray' : game === 'transfer' ? 'Transfer' : 'Strafe'
 
   return (
     <div
@@ -296,11 +484,11 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
         <Badge variant="secondary" className="bg-white/10 text-white backdrop-blur">
           {weapon.name}
         </Badge>
-        <Badge variant="outline" className="border-white/20 text-white/80">
-          {MODE_LABEL[mode]} · {bullets}
+        <Badge variant="outline" className="border-fuchsia-400/40 text-fuchsia-200">
+          {gameLabel}
         </Badge>
         <Badge variant="outline" className="border-white/20 text-white/80">
-          {weapon.rpm} RPM · {weapon.cycleMs} ms
+          {bullets} balas · {weapon.cycleMs} ms
         </Badge>
         <Badge variant="outline" className="hidden border-white/20 text-white/60 sm:inline-flex">
           {bpmForCycle(weapon.cycleMs).toFixed(1)} BPM
@@ -322,10 +510,11 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
           <MousePointerClick className="size-9 text-fuchsia-300" />
           <p className="text-lg font-semibold">Hacé click para capturar el mouse</p>
           <p className="max-w-sm text-sm text-white/70">
-            Después mantené el click izquierdo: la primera bala sale al instante y el resto a {weapon.cycleMs} ms,
-            la cadencia real de la {weapon.name}. Seguí el láser con la mira.
+            {game === 'strafe'
+              ? 'Después: A/D al ritmo de las notas y click izquierdo solo en las ventanas FIRE, cuando estés quieto.'
+              : `Mantené click izquierdo: la primera bala sale al instante y el resto a ${weapon.cycleMs} ms. Seguí el láser.`}
           </p>
-          <p className="text-xs text-white/50">Esc libera el mouse en cualquier momento</p>
+          <p className="text-xs text-white/50">Click derecho o Esc liberan el mouse</p>
         </Overlay>
       )}
 
@@ -333,8 +522,7 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
         <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3">
           <div className="flex items-center gap-2 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs text-amber-200 ring-1 ring-amber-400/30 backdrop-blur">
             <TriangleAlert className="size-3.5" />
-            El navegador no permitió capturar el puntero: se usa movimiento relativo sin captura. Mantené click para
-            disparar.
+            El navegador no permitió capturar el puntero: se usa movimiento relativo sin captura.
           </div>
         </div>
       )}
@@ -343,7 +531,9 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
         <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-3">
           <div className="flex items-center gap-2 rounded-lg bg-black/50 px-3 py-1.5 text-xs text-white/80 ring-1 ring-white/10 backdrop-blur">
             <Keyboard className="size-3.5" />
-            Mantené click izquierdo para disparar · soltá para cortar la ráfaga · R reinicia
+            {game === 'strafe'
+              ? 'A/D · click en FIRE quieto · click derecho libera'
+              : 'Click izquierdo dispara · A/D para strafear · click derecho libera · R reinicia'}
           </div>
         </div>
       )}
@@ -369,9 +559,11 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
               <div className="text-lg font-semibold tabular-nums">{lastResult.score.toLocaleString('es-AR')} pts</div>
               <div className="text-xs text-white/70">
                 {Math.round(lastResult.accuracy * 100)}% precisión · combo x{lastResult.maxCombo}
+                {lastResult.transfer && ` · ${lastResult.transfer.kills}/${lastResult.transfer.targets} kills`}
+                {lastResult.strafe && ` · ${lastResult.strafe.cleanWindows}/${lastResult.strafe.windows} limpios`}
                 {!lastResult.completed && ` · cortaste en la bala ${lastResult.shots.length}`}
               </div>
-              <div className="mt-0.5 text-[11px] text-white/50">Click o R para repetir</div>
+              <div className="mt-0.5 text-[11px] text-white/50">Click o R para repetir · click derecho libera</div>
             </div>
           </div>
         </div>

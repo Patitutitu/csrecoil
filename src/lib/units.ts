@@ -1,4 +1,5 @@
 import type { DrillMode, Vec2, WeaponDef } from '@/engine/types'
+import { HITS_TO_KILL, targetsForMode } from './transfer'
 
 /** m_yaw / m_pitch por defecto de CS2: grados por count de mouse a sensibilidad 1. */
 export const CS2_DEG_PER_COUNT = 0.022
@@ -38,6 +39,14 @@ export function bulletsForMode(weapon: WeaponDef, mode: DrillMode): number {
       return Math.min(9, weapon.magazine)
     case 'full':
       return weapon.magazine
+    case 't2':
+    case 't3':
+    case 't5':
+      return targetsForMode(mode, weapon) * HITS_TO_KILL
+    case 'tap':
+      return 1
+    case 'burst':
+      return Math.min(4, weapon.magazine)
   }
 }
 

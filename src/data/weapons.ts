@@ -13,6 +13,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 600,
     cycleMs: 100,
     magazine: 30,
+    maxSpeed: 215,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -56,6 +57,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 667,
     cycleMs: 90,
     magazine: 30,
+    maxSpeed: 225,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -99,6 +101,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 600,
     cycleMs: 100,
     magazine: 20,
+    maxSpeed: 225,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -132,6 +135,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 667,
     cycleMs: 90,
     magazine: 35,
+    maxSpeed: 215,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -180,6 +184,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 667,
     cycleMs: 90,
     magazine: 25,
+    maxSpeed: 220,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -218,6 +223,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 545,
     cycleMs: 110,
     magazine: 30,
+    maxSpeed: 210,
     source: "Artanis-RCS en unidades absolutas (0.0506°/unidad, calibrado con las armas medidas); forma validada contra el recorrido de Leetify",
     pattern: [
       { x: 0, y: 0 },
@@ -261,6 +267,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 600,
     cycleMs: 100,
     magazine: 30,
+    maxSpeed: 220,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -304,6 +311,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 800,
     cycleMs: 75,
     magazine: 30,
+    maxSpeed: 240,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -347,6 +355,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 857,
     cycleMs: 70,
     magazine: 30,
+    maxSpeed: 240,
     source: "Video propio en CS2 (Recoil Master, 1600x900 a 60 fps, sin mover el mouse): mira de recoil + compensación de cámara con referencias fijas de la pared, muestreada justo antes de cada disparo; validado contra los impactos en la pared",
     pattern: [
       { x: 0, y: 0 },
@@ -390,6 +399,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 750,
     cycleMs: 80,
     magazine: 30,
+    maxSpeed: 220,
     source: "Artanis-RCS en unidades absolutas (0.0506°/unidad, calibrado con las armas medidas); forma validada contra el recorrido de Leetify",
     pattern: [
       { x: 0, y: 0 },
@@ -433,6 +443,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 667,
     cycleMs: 90,
     magazine: 25,
+    maxSpeed: 230,
     source: "Artanis-RCS en unidades absolutas (0.0506°/unidad, calibrado con las armas medidas); forma validada contra el recorrido de Leetify",
     pattern: [
       { x: 0, y: 0 },
@@ -471,6 +482,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 857,
     cycleMs: 70,
     magazine: 50,
+    maxSpeed: 230,
     source: "Artanis-RCS en unidades absolutas (0.0506°/unidad, calibrado con las armas medidas); forma validada contra el recorrido de Leetify",
     pattern: [
       { x: 0, y: 0 },
@@ -534,6 +546,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 750,
     cycleMs: 80,
     magazine: 64,
+    maxSpeed: 240,
     source: "Artanis-RCS en unidades absolutas (0.0506°/unidad, calibrado con las armas medidas); forma validada contra el recorrido de Leetify",
     pattern: [
       { x: 0, y: 0 },
@@ -611,6 +624,7 @@ export const WEAPONS: WeaponDef[] = [
     rpm: 750,
     cycleMs: 80,
     magazine: 100,
+    maxSpeed: 195,
     source: "Artanis-RCS en unidades absolutas (0.0506°/unidad, calibrado con las armas medidas); forma validada contra el recorrido de Leetify",
     pattern: [
       { x: 0, y: 0 },

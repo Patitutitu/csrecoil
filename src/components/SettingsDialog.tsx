@@ -125,6 +125,10 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
               onValueChange={(v) => onChange({ volume: Array.isArray(v) ? v[0] : v })}
             />
           </div>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="ghost">Fantasma del récord personal</Label>
+            <Switch id="ghost" checked={settings.ghost} onCheckedChange={(v) => onChange({ ghost: v })} />
+          </div>
         </div>
 
         <DialogFooter>
