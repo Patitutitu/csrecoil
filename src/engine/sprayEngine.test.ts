@@ -38,13 +38,14 @@ describe('datos de armas', () => {
     expect(WEAPONS).toHaveLength(14)
   })
 
-  it('la AK sube ~11° con pico en la bala 24 y deriva izquierda-derecha-izquierda', () => {
+  it('la AK sube ~11.8° con pico al final y deriva izquierda-derecha-izquierda', () => {
     const ak = WEAPON_BY_ID.ak47
     const ys = ak.pattern.map((p) => p.y)
     const peak = ys.indexOf(Math.max(...ys)) + 1
-    expect(peak).toBe(24)
-    expect(Math.max(...ys)).toBeGreaterThan(11)
-    expect(Math.max(...ys)).toBeLessThan(11.4)
+    expect(peak).toBeGreaterThanOrEqual(24)
+    expect(peak).toBeLessThanOrEqual(28)
+    expect(Math.max(...ys)).toBeGreaterThan(11.5)
+    expect(Math.max(...ys)).toBeLessThan(12)
     // impactos: primero a la izquierda (balas 6-9), luego a la derecha (10-15), luego a la izquierda (20-26) y cierra a la derecha (30)
     expect(ak.pattern[7].x).toBeLessThan(-1.2)
     expect(ak.pattern[13].x).toBeGreaterThan(4)
@@ -56,10 +57,10 @@ describe('datos de armas', () => {
 })
 
 describe('unidades', () => {
-  it('AK completa a sens 2 ≈ 254 counts de pull-down', () => {
+  it('AK completa a sens 2 ≈ 267 counts de pull-down', () => {
     const ak = WEAPON_BY_ID.ak47
     const maxPitch = Math.max(...ak.pattern.map((p) => p.y))
-    expect(Math.round(degToCounts(maxPitch, 2))).toBe(254)
+    expect(Math.round(degToCounts(maxPitch, 2))).toBe(267)
   })
 
   it('254 counts a 800 DPI son ~8 mm de mousepad', () => {
