@@ -5,6 +5,12 @@ import { bulletsForMode } from '@/lib/units'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
+const CATEGORIES: { id: WeaponDef['category']; label: string }[] = [
+  { id: 'rifle', label: 'Rifles' },
+  { id: 'smg', label: 'Subfusiles' },
+  { id: 'lmg', label: 'Ametralladora' },
+]
+
 interface ControlsProps {
   weapon: WeaponDef
   mode: DrillMode
@@ -30,35 +36,42 @@ export function Controls({ weapon, mode, guide, onWeapon, onMode, onGuide }: Con
           <CardTitle>Arma</CardTitle>
           <CardDescription>Cadencia y patrón reales de CS2</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-1.5 px-4">
-          {WEAPONS.map((w, i) => (
-            <button
-              key={w.id}
-              type="button"
-              onClick={() => onWeapon(w)}
-              className={cn(
-                'flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors',
-                w.id === weapon.id
-                  ? 'border-fuchsia-400/60 bg-fuchsia-500/15 text-white'
-                  : 'border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.07]',
-              )}
-            >
-              <span
-                className={cn(
-                  'rounded px-1 text-[10px] font-bold',
-                  w.team === 'T' ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300',
-                )}
-              >
-                {w.team}
-              </span>
-              <span className="flex flex-col leading-tight">
-                <span className="font-medium">{w.name}</span>
-                <span className="text-[11px] text-white/50">
-                  {w.rpm} RPM · {w.cycleMs} ms
-                </span>
-              </span>
-              <Key>{i + 1}</Key>
-            </button>
+        <CardContent className="flex flex-col gap-3 px-4">
+          {CATEGORIES.map((c) => (
+            <div key={c.id}>
+              <div className="mb-1.5 text-[11px] font-medium tracking-wide text-white/40 uppercase">{c.label}</div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {WEAPONS.filter((w) => w.category === c.id).map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => onWeapon(w)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors',
+                    w.id === weapon.id
+                      ? 'border-fuchsia-400/60 bg-fuchsia-500/15 text-white'
+                      : 'border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.07]',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'rounded px-1 text-[10px] font-bold',
+                      w.team === 'T' ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300',
+                    )}
+                  >
+                    {w.team}
+                  </span>
+                  <span className="flex flex-col leading-tight">
+                    <span className="font-medium">{w.name}</span>
+                    <span className="text-[11px] text-white/50">
+                      {w.rpm} RPM · {w.cycleMs} ms
+                    </span>
+                  </span>
+                  {WEAPONS.indexOf(w) < 9 && <Key>{WEAPONS.indexOf(w) + 1}</Key>}
+                </button>
+                ))}
+              </div>
+            </div>
           ))}
         </CardContent>
       </Card>

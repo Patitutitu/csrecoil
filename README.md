@@ -18,7 +18,7 @@ Requiere un navegador de escritorio con mouse. Chrome/Edge usan `pointerrawupdat
 
 ## Cómo se juega
 
-1. Elegí arma (`1`–`7`), ejercicio (`Q` 4 balas, `W` 9 balas, `E` cargador completo) y nivel de guía (`G`: Guiado → Fade → Ciego).
+1. Elegí arma (rifles, subfusiles o M249; `1`–`9` para las primeras), ejercicio (`Q` 4 balas, `W` 9 balas, `E` cargador completo) y nivel de guía (`G`: Guiado → Fade → Ciego).
 2. Click en el área de juego para capturar el mouse. En **Ajustes** cargá tu sensibilidad y DPI reales.
 3. Mantené el click izquierdo: la primera bala sale al instante y el resto a la cadencia del arma. Seguí el láser con la mira; soltá para cortar la ráfaga como en el juego.
 4. Cada bala recibe **Perfecto (≤ 0,3°) / Genial (≤ 0,6°) / Bien (≤ 1,0°) / Fallo**, con combo que multiplica hasta x2. Al terminar ves tu recorrido superpuesto al ideal, el error por bala y la nota (S/A/B/C/D).
@@ -53,18 +53,30 @@ src/
 
 | Arma | RPM | ms/bala | Cargador | Origen del patrón |
 | --- | --- | --- | --- | --- |
-| AK-47 | 600 | 100 | 30 | Impactos por bala del GIF *AK-47-Spray* de BloodyCase (30 balas sin mover el mouse, ordenadas por cuadro de aparición), escalados a la subida medida de 11,18° |
-| M4A4 | 667 | 90 | 30 | Medición por bala en grados de imbaboost |
-| M4A1-S | 600 | 100 | 20 | Medición por bala en grados de imbaboost |
-| Galil AR | 667 | 90 | 35 | Forma de [Artanis-RCS](https://github.com/ArtanisInc/Artanis-RCS), escalada a la altura publicada por csstats.gg (7,31°) |
-| FAMAS | 667 | 90 | 25 | Ídem, altura 6,96° |
-| SG 553 | 545 | 110 | 30 | Ídem, altura 8,59° |
-| AUG | 600 | 100 | 30 | Ídem, altura 7,84° |
+| AK-47 | 600 | 100 | 30 | Impactos por bala del GIF *AK-47-Spray* de BloodyCase, escalados a la subida medida de 11,18° |
+| M4A4 | 667 | 90 | 30 | Medición por bala en grados de imbaboost (2026-10-09) |
+| M4A1-S | 600 | 100 | 20 | Medición por bala en grados de imbaboost (2026-10-09) |
+| Galil AR | 667 | 90 | 35 | Artanis-RCS en unidades absolutas |
+| FAMAS | 667 | 90 | 25 | Artanis-RCS en unidades absolutas |
+| SG 553 | 545 | 110 | 30 | Artanis-RCS en unidades absolutas |
+| AUG | 600 | 100 | 30 | Artanis-RCS en unidades absolutas |
+| MAC-10 | 800 | 75 | 30 | Artanis-RCS en unidades absolutas |
+| MP9 | 857 | 70 | 30 | Artanis-RCS en unidades absolutas |
+| MP7 | 750 | 80 | 30 | Artanis-RCS en unidades absolutas |
+| UMP-45 | 667 | 90 | 25 | Artanis-RCS en unidades absolutas |
+| P90 | 857 | 70 | 50 | Artanis-RCS en unidades absolutas |
+| PP-Bizon | 750 | 80 | 64 | Artanis-RCS en unidades absolutas |
+| M249 | 750 | 80 | 100 | Artanis-RCS en unidades absolutas |
 
-Validación cruzada: para M4A4 y M4A1-S la forma de Artanis-RCS escalada coincide con la medición directa dentro de ~0,1° por bala. La AK-47 se toma del GIF de impactos (*Spray*). Escalando solo la altura a 11,18°, el ancho resultante es 7,09°, igual al 7,14° publicado por csstats. Además, invertido en ambos ejes (la compensación del mouse), coincide con el recorrido del GIF *Recoil* de la misma fuente con un error medio de ~0,24°.
+Validación cruzada:
+
+- **AK-47**: escalando solo la altura, el ancho da 7,09° (csstats publica 7,14°). Invertido en ambos ejes coincide con el GIF *AK-47-Recoil* de la misma fuente con ~0,24° de error medio.
+- **Artanis-RCS** guarda los patrones en unidades fijas: en las 10 armas con altura publicada da 0,0506° por unidad (±2 %), así que se convierte a grados con una sola constante. Contra la medición en grados de imbaboost, Artanis tiene 0,14–0,19° de error medio por bala.
+- **Leetify** (recorridos de compensación de las 16 variantes, en `recoils.zip`) se usa para validar la forma. Reescala cada GIF para que el patrón entre en el cuadro y su punto llega ~120 ms después del contador; muestreado con ese desfase queda a 0,3–0,4° de la medición en M4A4 y M4A1-S, peor que Artanis, por eso no es la fuente principal. Contra Artanis coincide dentro de 0,4–0,8° de media en rifles y subfusiles de cargador corto; P90, PP-Bizon y M249 se separan más en el final de cargadores largos.
+- La cadencia y el cargador de cada arma son los valores oficiales de CS2.
 
 Si Valve ajusta un patrón, basta con reemplazar el vector del arma en ese archivo.
 
 ## Fuera de alcance (por ahora)
 
-Modo lento (a propósito), objetivos/disparos, multijugador, backend, SMGs (agregar una SMG es solo sumar su entrada en `weapons.ts`).
+Modo lento (a propósito), objetivos/disparos, multijugador, backend, variantes con mira (AUG/SG 553) y M4A1-S sin silenciador: no hay una fuente en grados para esos patrones.

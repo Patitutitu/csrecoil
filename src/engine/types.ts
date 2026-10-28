@@ -8,6 +8,7 @@ export interface WeaponDef {
   name: string
   short: string
   team: 'T' | 'CT'
+  category: 'rifle' | 'smg' | 'lmg'
   /** Disparos por minuto reales del arma. */
   rpm: number
   /** Intervalo real entre balas en milisegundos (cycletime del arma). */

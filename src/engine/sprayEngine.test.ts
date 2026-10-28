@@ -21,6 +21,23 @@ describe('datos de armas', () => {
     expect(WEAPON_BY_ID.galil.magazine).toBe(35)
   })
 
+  it('subfusiles y M249 con su cadencia real', () => {
+    const expected: Record<string, [number, number]> = {
+      mac10: [75, 30],
+      mp9: [70, 30],
+      mp7: [80, 30],
+      ump45: [90, 25],
+      p90: [70, 50],
+      bizon: [80, 64],
+      m249: [80, 100],
+    }
+    for (const [id, [cycle, mag]] of Object.entries(expected)) {
+      expect(WEAPON_BY_ID[id].cycleMs).toBe(cycle)
+      expect(WEAPON_BY_ID[id].magazine).toBe(mag)
+    }
+    expect(WEAPONS).toHaveLength(14)
+  })
+
   it('la AK sube ~11° con pico en la bala 24 y deriva izquierda-derecha-izquierda', () => {
     const ak = WEAPON_BY_ID.ak47
     const ys = ak.pattern.map((p) => p.y)
