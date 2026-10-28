@@ -22,7 +22,7 @@ export const GAMES: {
   {
     id: 'strafe',
     label: 'Strafe',
-    hint: 'A/D al ritmo + dispará solo cuando estás quieto (≤34 % velocidad)',
+    hint: 'AAAA→DDDD (counter) y recién ahí disparás quieto. Solo A y disparar = inválido',
     icon: Keyboard,
   },
 ]
@@ -40,8 +40,8 @@ export const TRANSFER_MODES: { id: TransferMode; label: string; key: string; hin
 ]
 
 export const STRAFE_MODES: { id: StrafeMode; label: string; key: string; hint: string }[] = [
-  { id: 'tap', label: 'Tap', key: 'Q', hint: 'Strafe → frená → 1 bala quieto · 10 ventanas' },
-  { id: 'burst', label: 'Burst', key: 'W', hint: 'Strafe → frená → 4 balas quieto · 8 ventanas' },
+  { id: 'tap', label: 'Tap', key: 'Q', hint: 'AAAA → DDDD (counter) → 1 bala · sin counter no dispara' },
+  { id: 'burst', label: 'Burst', key: 'W', hint: 'AAAA → DDDD (counter) → 4 balas · sin counter no dispara' },
 ]
 
 /** @deprecated usar RECOIL_MODES; se mantiene para compat de imports viejos */

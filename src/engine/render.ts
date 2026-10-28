@@ -618,28 +618,34 @@ function drawStrafeHighway(
     const y1 = hitY - (n.start - rel) * pxPerMs
     const y2 = hitY - (n.end - rel) * pxPerMs
     if (y2 > h + 40 || y1 < -40) return
-    if (n.kind === 'hold') {
+    if (n.kind === 'hold' || n.kind === 'counter') {
       const x = lanes[n.key]
       const top = Math.min(y1, y2)
       const bot = Math.max(y1, y2)
       const past = rel > n.end
       const active = rel >= n.start && rel <= n.end
+      const isCounter = n.kind === 'counter'
       ctx.fillStyle = past
         ? 'rgba(148,163,184,0.25)'
         : n.key === 'a'
           ? active
-            ? 'rgba(56,189,248,0.75)'
+            ? 'rgba(56,189,248,0.85)'
             : 'rgba(56,189,248,0.45)'
           : active
-            ? 'rgba(251,146,60,0.75)'
+            ? 'rgba(251,146,60,0.85)'
             : 'rgba(251,146,60,0.45)'
-      roundRect(ctx, x - laneW / 2, top, laneW, Math.max(12, bot - top), 8)
+      roundRect(ctx, x - laneW / 2, top, laneW, Math.max(isCounter ? 18 : 12, bot - top), 8)
       ctx.fill()
+      if (isCounter) {
+        ctx.strokeStyle = active ? '#f8fafc' : 'rgba(248,250,252,0.55)'
+        ctx.lineWidth = 2
+        ctx.stroke()
+      }
       ctx.fillStyle = '#fff'
-      ctx.font = '800 18px ui-sans-serif, system-ui, sans-serif'
+      ctx.font = isCounter ? '800 14px ui-sans-serif, system-ui, sans-serif' : '800 18px ui-sans-serif, system-ui, sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(n.key.toUpperCase(), x, (top + bot) / 2)
+      ctx.fillText(isCounter ? `${n.key.toUpperCase()} CS` : n.key.toUpperCase(), x, (top + bot) / 2)
     } else {
       const x = lanes.fire
       const top = Math.min(y1, y2)

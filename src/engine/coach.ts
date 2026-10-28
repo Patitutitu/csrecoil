@@ -213,10 +213,12 @@ function buildTips(args: {
         tips.push(
           `Tardás ${Math.round(s.meanStopMs)} ms en frenar. Con counter-strafe (tecla opuesta) deberías quedar quieto en ~80 ms.`,
         )
-      } else if (s.counterStrafes < s.windows / 2) {
-        tips.push('Usá más counter-strafe: al soltar A apretá D un instante (y al revés) para frenar al toque.')
+      } else if (s.counterStrafes < s.windows) {
+        tips.push(
+          `Counter obligatorio: AAAA y disparar no vale. Tiene que ser AAAADDDD (tecla opuesta) y recién ahí FIRE. Completaste ${s.counterStrafes}/${s.windows}.`,
+        )
       } else {
-        tips.push(`Frenado limpio: ${Math.round(s.meanStopMs)} ms de media · ${s.counterStrafes}/${s.windows} con counter-strafe.`)
+        tips.push(`Counter limpio: ${Math.round(s.meanStopMs)} ms de media · ${s.counterStrafes}/${s.windows}.`)
       }
     }
     if (s.holdSync < 0.75) {

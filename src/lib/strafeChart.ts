@@ -4,6 +4,8 @@ import { mulberry32 } from './random'
 
 export type ChartNote =
   | { kind: 'hold'; key: StrafeKey; start: number; end: number }
+  /** Tecla opuesta obligatoria para frenar (counter-strafe). Sin esto no se puede disparar. */
+  | { kind: 'counter'; key: StrafeKey; start: number; end: number; window: number }
   | { kind: 'fire'; start: number; end: number; bullets: number; window: number }
 
 export interface StrafeChart {
@@ -15,20 +17,23 @@ export interface StrafeChart {
   durationMs: number
 }
 
-/** Margen para frenar (~80 ms con counter-strafe) y reaccionar antes del primer disparo. */
-const STOP_AND_REACT_MS = 350
+/** Margen para reaccionar y disparar quieto después del counter. */
+const REACT_AND_FIRE_MS = 280
 const MIN_HOLD_MS = 420
+/** Duración visual/jugable de la nota de counter (~1 tap). */
+const COUNTER_BEATS = 1
 
 /**
- * Partitura del modo strafe a tempo del arma (1 tiempo = 4 balas): notas sostenidas de A o D
- * para moverte y, entre ellas, una ventana sin teclas para frenar y disparar quieto.
+ * Partitura: AAAAA → DDDD (counter) → FIRE quieto → DDDDD → AAAA (counter) → FIRE…
+ * Nunca se dispara solo después de una tecla: siempre hace falta el counter-strafe.
  */
 export function buildStrafeChart(weapon: WeaponDef, mode: StrafeMode, seed: number): StrafeChart {
   const rnd = mulberry32(seed ^ 0x5bd1e995)
   const beatMs = weapon.cycleMs * 4
   const bulletsPerWindow = mode === 'tap' ? 1 : Math.min(4, weapon.magazine)
   const windows = mode === 'tap' ? 10 : 8
-  const fireBeats = Math.max(1, Math.ceil(((bulletsPerWindow - 1) * weapon.cycleMs + STOP_AND_REACT_MS) / beatMs))
+  const counterMs = COUNTER_BEATS * beatMs
+  const fireBeats = Math.max(1, Math.ceil(((bulletsPerWindow - 1) * weapon.cycleMs + REACT_AND_FIRE_MS) / beatMs))
   const minHoldBeats = Math.max(1, Math.ceil(MIN_HOLD_MS / beatMs))
   const leadInMs = beatMs * 4
   const notes: ChartNote[] = []
@@ -38,10 +43,17 @@ export function buildStrafeChart(weapon: WeaponDef, mode: StrafeMode, seed: numb
     const holdBeats = minHoldBeats + Math.floor(rnd() * 3)
     const holdEnd = t + holdBeats * beatMs
     notes.push({ kind: 'hold', key, start: t, end: holdEnd })
-    const fireEnd = holdEnd + fireBeats * beatMs
-    notes.push({ kind: 'fire', start: holdEnd, end: fireEnd, bullets: bulletsPerWindow, window: w })
+    const opposite: StrafeKey = key === 'a' ? 'd' : 'a'
+    const counterEnd = holdEnd + counterMs
+    notes.push({ kind: 'counter', key: opposite, start: holdEnd, end: counterEnd, window: w })
+    const fireEnd = counterEnd + fireBeats * beatMs
+    notes.push({ kind: 'fire', start: counterEnd, end: fireEnd, bullets: bulletsPerWindow, window: w })
     t = fireEnd
-    key = key === 'a' ? 'd' : 'a'
+    key = opposite
   }
   return { beatMs, leadInMs, notes, windows, bulletsPerWindow, durationMs: t + beatMs }
+}
+
+export function oppositeKey(key: StrafeKey): StrafeKey {
+  return key === 'a' ? 'd' : 'a'
 }

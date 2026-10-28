@@ -511,7 +511,7 @@ export function PlayArea({
           <p className="text-lg font-semibold">Hacé click para capturar el mouse</p>
           <p className="max-w-sm text-sm text-white/70">
             {game === 'strafe'
-              ? 'Después: A/D al ritmo de las notas y click izquierdo solo en las ventanas FIRE, cuando estés quieto.'
+              ? 'Después: AAAA → DDDD (counter) → FIRE quieto. Sin la tecla opuesta el disparo no cuenta.'
               : `Mantené click izquierdo: la primera bala sale al instante y el resto a ${weapon.cycleMs} ms. Seguí el láser.`}
           </p>
           <p className="text-xs text-white/50">Click derecho o Esc liberan el mouse</p>
@@ -532,7 +532,7 @@ export function PlayArea({
           <div className="flex items-center gap-2 rounded-lg bg-black/50 px-3 py-1.5 text-xs text-white/80 ring-1 ring-white/10 backdrop-blur">
             <Keyboard className="size-3.5" />
             {game === 'strafe'
-              ? 'A/D · click en FIRE quieto · click derecho libera'
+              ? 'AAAA→DDDD counter · FIRE quieto · sin counter = inválido · click derecho libera'
               : 'Click izquierdo dispara · A/D para strafear · click derecho libera · R reinicia'}
           </div>
         </div>

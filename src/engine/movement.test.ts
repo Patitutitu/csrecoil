@@ -4,6 +4,7 @@ import { buildStrafeChart } from '@/lib/strafeChart'
 import { WEAPON_BY_ID } from '@/data/weapons'
 import { transferTargets, transferOffsets, HITS_TO_KILL } from '@/lib/transfer'
 import { movingSpreadDeg } from './sprayEngine'
+import { StrafeEngine } from './strafeEngine'
 
 describe('movimiento CS2', () => {
   it('a máxima velocidad, soltar sin counter tarda ~200 ms en caer bajo 34%', () => {
@@ -60,16 +61,58 @@ describe('spray transfer', () => {
 })
 
 describe('strafe chart', () => {
-  it('alterna holds A/D y ventanas FIRE a tempo del arma', () => {
+  it('es AAAA → counter opuesto → FIRE (nunca disparar solo con una tecla)', () => {
     const ak = WEAPON_BY_ID.ak47
     const chart = buildStrafeChart(ak, 'burst', 7)
     expect(chart.windows).toBe(8)
     expect(chart.bulletsPerWindow).toBe(4)
     expect(chart.beatMs).toBe(ak.cycleMs * 4)
     const holds = chart.notes.filter((n) => n.kind === 'hold')
+    const counters = chart.notes.filter((n) => n.kind === 'counter')
     const fires = chart.notes.filter((n) => n.kind === 'fire')
     expect(holds).toHaveLength(8)
+    expect(counters).toHaveLength(8)
     expect(fires).toHaveLength(8)
-    expect(holds[0].key).not.toBe(holds[1].key)
+    // hold A → counter D → fire; el siguiente hold es D
+    expect(counters[0].key).not.toBe(holds[0].key)
+    expect(holds[1].key).toBe(counters[0].key)
+    expect(holds[0].end).toBe(counters[0].start)
+    expect(counters[0].end).toBe(fires[0].start)
+  })
+})
+
+describe('strafe counter obligatorio', () => {
+  it('rechaza disparar sin tecla opuesta y acepta AAAADDDD', () => {
+    const move = new Movement(215)
+    const eng = new StrafeEngine({
+      weapon: WEAPON_BY_ID.ak47,
+      mode: 'tap',
+      guide: 'guided',
+      sensitivity: 1,
+      dpi: 800,
+      seed: 1,
+      movement: move,
+    })
+    eng.press(0)
+    const fire = eng.fireNotes[0]
+    const counter = eng.chart.notes.find((n) => n.kind === 'counter' && n.window === 0)
+    expect(counter).toBeTruthy()
+    const hold = eng.holdNotes[0]
+    // Solo A durante el hold, sin D → en la ventana FIRE el disparo falla
+    move.setKey(50, hold.key, true)
+    move.advance(hold.end)
+    move.setKey(hold.end, hold.key, false)
+    const bad = eng.press(eng.t0 + fire.start + 10)
+    expect(bad.some((e) => e.type === 'pop' && e.label.includes('SIN COUNTER'))).toBe(true)
+    expect(eng.windows[0].burst).toBeNull()
+
+    // Misma ventana pero ahora con counter opuesto → OK
+    move.setKey(eng.t0 + (counter as { start: number }).start + 5, (counter as { key: 'a' | 'd' }).key, true)
+    move.advance(eng.t0 + fire.start + 40)
+    move.setKey(eng.t0 + fire.start + 35, (counter as { key: 'a' | 'd' }).key, false)
+    const good = eng.press(eng.t0 + fire.start + 50)
+    expect(good.some((e) => e.type === 'pop' && e.label.includes('SIN COUNTER'))).toBe(false)
+    expect(eng.windows[0].burst).not.toBeNull()
+    expect(eng.windows[0].counter).toBe(true)
   })
 })

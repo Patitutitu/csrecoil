@@ -142,6 +142,13 @@ export class StrafeEngine {
       this.breakCombo()
       return [{ type: 'pop', label: 'ESPERÁ LA VENTANA', grade: 'miss' }]
     }
+    // Obligatorio: AAAA → disparar es inválido. Tiene que haber counter (AAAADDDD).
+    if (!this.hasCounterStrafe(w, t)) {
+      this.breakCombo()
+      this.award('miss')
+      return [{ type: 'pop', label: 'SIN COUNTER · AAAADDDD', grade: 'miss' }]
+    }
+    w.counter = true
     const burst = new SprayEngine({
       weapon: this.weapon,
       mode: this.mode,
@@ -194,18 +201,22 @@ export class StrafeEngine {
     }
 
     for (const w of this.windows) {
-      if (rel < w.note.start) break
+      // El frenado se mide desde el inicio de la nota COUNTER (fin del hold).
+      const counter = this.counterNote(w.note.window)
+      const stopFrom = counter?.start ?? w.note.start
+      if (rel < stopFrom) continue
       if (w.stopMs === null && !w.judged) {
-        const stop = this.findStop(w.note.start, Math.min(rel, w.note.end))
+        const stop = this.findStop(stopFrom, Math.min(rel, w.note.end))
         if (stop !== null) {
           w.stopAt = stop
-          w.stopMs = Math.max(0, stop - w.note.start)
-          w.counter = this.counterStrafed(w)
-          const grade = gradeStop(w.stopMs)
+          w.stopMs = Math.max(0, stop - stopFrom)
+          w.counter = this.hasCounterStrafe(w, this.t0 + stop)
+          // Sin counter no hay frenado válido: soltar solo A nunca alcanza.
+          const grade = w.counter ? gradeStop(w.stopMs) : 'miss'
           this.award(grade)
           events.push({
             type: 'pop',
-            label: `${w.counter ? 'COUNTER ' : 'FRENADO '}${Math.round(w.stopMs)} ms`,
+            label: w.counter ? `COUNTER ${Math.round(w.stopMs)} ms` : 'SIN COUNTER',
             grade,
           })
         }
@@ -214,11 +225,19 @@ export class StrafeEngine {
         w.judged = true
         if (w.stopMs === null) {
           this.award('miss')
-          events.push({ type: 'pop', label: 'NO FRENASTE', grade: 'miss' })
+          events.push({
+            type: 'pop',
+            label: this.hasCounterStrafe(w, this.t0 + w.note.end) ? 'NO FRENASTE' : 'SIN COUNTER',
+            grade: 'miss',
+          })
         }
         if (!w.burst) {
           this.breakCombo()
           events.push({ type: 'pop', label: 'NO DISPARASTE', grade: 'miss' })
+        } else if (!w.counter) {
+          // Disparó sin counter (no debería pasar por el hard-block, pero por si acaso).
+          this.breakCombo()
+          events.push({ type: 'pop', label: 'SIN COUNTER', grade: 'miss' })
         }
       }
     }
@@ -269,12 +288,31 @@ export class StrafeEngine {
     return null
   }
 
-  private counterStrafed(w: WindowState): boolean {
-    const prevHold = this.holdNotes.find((h) => h.end === w.note.start)
-    if (!prevHold) return false
-    const opposite: StrafeKey = prevHold.key === 'a' ? 'd' : 'a'
-    const from = this.t0 + w.note.start - 80
-    const to = this.t0 + (w.stopAt ?? w.note.start) + 30
+  private counterNote(window: number): Extract<ChartNote, { kind: 'counter' }> | undefined {
+    return this.chart.notes.find(
+      (n): n is Extract<ChartNote, { kind: 'counter' }> => n.kind === 'counter' && n.window === window,
+    )
+  }
+
+  private prevHold(window: number): Extract<ChartNote, { kind: 'hold' }> | undefined {
+    const counter = this.counterNote(window)
+    if (!counter) return undefined
+    return this.holdNotes.find((h) => h.end === counter.start)
+  }
+
+  /**
+   * Counter-strafe real: después del strafe (AAAA) tenés que apretar la tecla opuesta (DDDD).
+   * Soltar solo A y disparar no cuenta.
+   */
+  hasCounterStrafe(w: WindowState, atPerfMs: number): boolean {
+    if (w.counter) return true
+    const hold = this.prevHold(w.note.window)
+    const counter = this.counterNote(w.note.window)
+    if (!hold || !counter) return false
+    const opposite: StrafeKey = counter.key
+    // Ventana: desde un poco antes de la nota counter hasta el momento del disparo/stop.
+    const from = this.t0 + counter.start - 120
+    const to = atPerfMs + 40
     return this.keyLog.some((k) => k.key === opposite && k.down && k.t >= from && k.t <= to)
   }
 
@@ -311,7 +349,7 @@ export class StrafeEngine {
       .map((w) => Math.max(0, (w.firstShotAt as number) - this.t0 - (w.stopAt as number)))
     const cleanWindows = this.windows.filter((w) => {
       const shots = this.shots.filter((s) => s.group === w.note.window)
-      return shots.length === w.note.bullets && shots.every((s) => !s.moving)
+      return w.counter && shots.length === w.note.bullets && shots.every((s) => !s.moving)
     }).length
     const holdSync = this.holdResults.length
       ? this.holdResults.reduce((a, h) => a + h.sync, 0) / this.holdResults.length
