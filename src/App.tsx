@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Crosshair, Volume2, VolumeX } from 'lucide-react'
-import { Controls, GUIDES, MODES } from '@/components/Controls'
+import { Controls } from '@/components/Controls'
 import { PlayArea } from '@/components/PlayArea'
 import { ResultsPanel } from '@/components/ResultsPanel'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -11,6 +11,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { WEAPONS } from '@/data/weapons'
 import { audioEngine } from '@/engine/audio'
 import type { DrillMode, GuideLevel, RunResult, WeaponDef } from '@/engine/types'
+import { GUIDES, MODES } from '@/lib/drills'
 import { bulletsForMode } from '@/lib/units'
 import { bestRun, useHistory, useSettings } from '@/store/storage'
 
@@ -56,12 +57,15 @@ export default function App() {
     } catch {
       // ignorar
     }
-    setLastResult(null)
   }, [session])
 
-  const setWeapon = useCallback((w: WeaponDef) => setSession((s) => ({ ...s, weaponId: w.id })), [])
-  const setMode = useCallback((m: DrillMode) => setSession((s) => ({ ...s, mode: m })), [])
-  const setGuide = useCallback((g: GuideLevel) => setSession((s) => ({ ...s, guide: g })), [])
+  const patchSession = useCallback((fn: (s: SessionState) => SessionState) => {
+    setSession(fn)
+    setLastResult(null)
+  }, [])
+  const setWeapon = useCallback((w: WeaponDef) => patchSession((s) => ({ ...s, weaponId: w.id })), [patchSession])
+  const setMode = useCallback((m: DrillMode) => patchSession((s) => ({ ...s, mode: m })), [patchSession])
+  const setGuide = useCallback((g: GuideLevel) => patchSession((s) => ({ ...s, guide: g })), [patchSession])
 
   const onFinished = useCallback(
     (r: RunResult) => {
@@ -94,7 +98,7 @@ export default function App() {
           setMode('full')
           break
         case 'g':
-          setSession((s) => {
+          patchSession((s) => {
             const i = GUIDES.findIndex((g) => g.id === s.guide)
             return { ...s, guide: GUIDES[(i + 1) % GUIDES.length].id }
           })
@@ -114,7 +118,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settingsOpen, settings.audio, updateSettings, weapon, mode, setWeapon, setMode])
+  }, [settingsOpen, settings.audio, updateSettings, weapon, mode, setWeapon, setMode, patchSession])
 
   const best = bestRun(history, weapon.id, mode, guide)
 

@@ -50,15 +50,22 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
   const judgmentsRef = useRef<Judgment[]>([])
   const lockRef = useRef<LockState>('unlocked')
   const onFinishedRef = useRef(onFinished)
-  onFinishedRef.current = onFinished
+  const optsRef = useRef({ weapon, mode, guide, sensitivity: settings.sensitivity, dpi: settings.dpi })
 
   const [lockState, setLockState] = useState<LockState>('unlocked')
   const [uiStatus, setUiStatus] = useState<UiStatus>('idle')
   const [lastResult, setLastResult] = useState<RunResult | null>(null)
-  const [isTouch, setIsTouch] = useState(false)
+  const [isTouch] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches
+      : false,
+  )
 
-  const optsRef = useRef({ weapon, mode, guide, sensitivity: settings.sensitivity, dpi: settings.dpi })
-  optsRef.current = { weapon, mode, guide, sensitivity: settings.sensitivity, dpi: settings.dpi }
+  // Se ejecuta antes que el resto de los efectos en cada render: mantiene las refs al día.
+  useEffect(() => {
+    onFinishedRef.current = onFinished
+    optsRef.current = { weapon, mode, guide, sensitivity: settings.sensitivity, dpi: settings.dpi }
+  })
 
   const resetEngine = useCallback(() => {
     audioEngine.cancelScheduled()
@@ -78,11 +85,6 @@ export function PlayArea({ weapon, mode, guide, settings, retryToken, onFinished
     audioEngine.beat = settings.beat
     audioEngine.setVolume(settings.volume)
   }, [settings.audio, settings.beat, settings.volume])
-
-  useEffect(() => {
-    const coarse = window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches
-    setIsTouch(coarse)
-  }, [])
 
   const setLock = useCallback((s: LockState) => {
     lockRef.current = s

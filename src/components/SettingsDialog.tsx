@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import type { Settings } from '@/engine/types'
 import { cmPer360 } from '@/lib/units'
@@ -28,12 +28,13 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
   const [sens, setSens] = useState(String(settings.sensitivity))
   const [dpi, setDpi] = useState(String(settings.dpi))
 
-  useEffect(() => {
-    if (open) {
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
       setSens(String(settings.sensitivity))
       setDpi(String(settings.dpi))
     }
-  }, [open, settings.sensitivity, settings.dpi])
+    onOpenChange(next)
+  }
 
   const sensNum = Number.parseFloat(sens.replace(',', '.'))
   const dpiNum = Number.parseInt(dpi, 10)
@@ -47,7 +48,7 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           <Button variant="outline" size="sm">
