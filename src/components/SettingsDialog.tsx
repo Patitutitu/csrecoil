@@ -218,8 +218,8 @@ export function SettingsDialog({ settings, onChange, open, onOpenChange }: Setti
             onValueChange={(v) => onChange({ viewZoom: Array.isArray(v) ? v[0] : v })}
           />
           <p className="text-[11px] leading-snug text-muted-foreground">
-            1× = tamaño relativo a tu resolución en esta ventana. 2–3× agranda el path para verlo mejor;
-            el mouse sigue moviéndose en grados reales de CS2 (cm/counts no cambian).
+            Dejá la resolución de CS2 (ej. 1600×900). El feel real lo dan sens+DPI+res a 1×; el zoom
+            solo agranda el dibujo. AK completa ~2–2,5×; 4× sirve para ráfagas cortas (si no, se corta).
           </p>
         </div>
 

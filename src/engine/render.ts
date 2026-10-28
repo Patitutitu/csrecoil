@@ -85,16 +85,39 @@ export interface ViewportOpts {
 }
 
 /**
- * Simulador CS2: el inicio del recoil (0,0) queda en el centro de la pantalla.
- * Escala = resolución/FOV de CS2 × zoom de práctica (no fit-to-screen del patrón).
+ * Simulador CS2: el inicio del recoil (0,0) prefiere el centro.
+ * Si el zoom no deja entrar el path (p. ej. AK ×4), se desplaza el ancla
+ * (suele subir) para que el pull-down quepa — sin cambiar px/° ni el mouse.
  */
-export function computeViewport(width: number, height: number, _path: Vec2[], opts: ViewportOpts = {}): Viewport {
+export function computeViewport(width: number, height: number, path: Vec2[], opts: ViewportOpts = {}): Viewport {
   const resW = opts.resWidth ?? 1920
   const resH = opts.resHeight ?? 1080
   const fov = opts.fov ?? 90
   const zoom = opts.viewZoom ?? 1
   const ppd = displayPixelsPerDegree(width, resW, resH, fov, zoom)
-  return { anchor: { x: width / 2, y: height / 2 }, ppd }
+  let ax = width / 2
+  let ay = height / 2
+  if (path.length > 0 && ppd > 0) {
+    const padX = 40
+    const padY = 56
+    let minX = 0
+    let maxX = 0
+    let minY = 0
+    let maxY = 0
+    for (const p of path) {
+      const ox = p.x * ppd
+      const oy = -p.y * ppd
+      minX = Math.min(minX, ox)
+      maxX = Math.max(maxX, ox)
+      minY = Math.min(minY, oy)
+      maxY = Math.max(maxY, oy)
+    }
+    if (ax + maxX > width - padX) ax = width - padX - maxX
+    if (ax + minX < padX) ax = padX - minX
+    if (ay + maxY > height - padY) ay = height - padY - maxY
+    if (ay + minY < padY) ay = padY - minY
+  }
+  return { anchor: { x: ax, y: ay }, ppd }
 }
 
 export function toScreen(v: Viewport, p: Vec2): Vec2 {

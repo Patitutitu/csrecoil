@@ -14,7 +14,7 @@ import type {
   StrafeMode,
   WeaponDef,
 } from '@/engine/types'
-import { bpmForCycle, bulletsForMode } from '@/lib/units'
+import { bpmForCycle, bulletsForMode, compensationPath, maxFitViewZoom } from '@/lib/units'
 import { randomSeed } from '@/lib/random'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -92,6 +92,7 @@ export function PlayArea({
   const [uiStatus, setUiStatus] = useState<UiStatus>('idle')
   const [lastResult, setLastResult] = useState<RunResult | null>(null)
   const [, setKeys] = useState({ a: false, d: false })
+  const [canvasSize, setCanvasSize] = useState({ w: 960, h: 540 })
   const [isTouch] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(pointer: coarse)').matches && !window.matchMedia('(pointer: fine)').matches
@@ -429,6 +430,7 @@ export function PlayArea({
       dpr = Math.min(window.devicePixelRatio || 1, 2)
       canvas.width = Math.floor(width * dpr)
       canvas.height = Math.floor(height * dpr)
+      setCanvasSize((prev) => (prev.w === width && prev.h === height ? prev : { w: width, h: height }))
     }
     resize()
     const ro = new ResizeObserver(resize)
@@ -504,6 +506,23 @@ export function PlayArea({
 
   const bullets = bulletsForMode(weapon, mode, customBullets)
   const gameLabel = game === 'recoil' ? 'Spray' : game === 'transfer' ? 'Transfer' : 'Strafe'
+  const fitZoom =
+    game === 'strafe'
+      ? 4
+      : maxFitViewZoom(
+          canvasSize.w,
+          canvasSize.h,
+          compensationPath(weapon, bullets),
+          settings.resWidth,
+          settings.resHeight,
+          settings.fov,
+        )
+  /**
+   * Dulce de práctica: grande pero no microscopio. Cap ~2.5× (feel cercano a CS2);
+   * si el spray no entra, usa el máximo que sí entra.
+   */
+  const sweetZoom = Math.min(2.5, fitZoom)
+  const recommendedZoom = ZOOM_PRESETS.reduce((best, z) => (z <= sweetZoom + 0.05 ? z : best), 1 as number)
 
   const aspect = settings.resWidth / Math.max(1, settings.resHeight)
 
@@ -539,27 +558,49 @@ export function PlayArea({
       </div>
 
       {onChangeSettings && game !== 'strafe' && (
-        <div className="absolute right-3 bottom-14 z-10 flex items-center gap-1 rounded-lg bg-black/45 p-1 ring-1 ring-white/10 backdrop-blur">
-          <span className="px-1.5 text-[10px] tracking-wide text-white/50 uppercase">Zoom</span>
-          {ZOOM_PRESETS.map((z) => {
-            const active = Math.abs(settings.viewZoom - z) < 0.05
-            return (
-              <button
-                key={z}
-                type="button"
-                className={cn(
-                  'rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors',
-                  active ? 'bg-cyan-500/30 text-cyan-100' : 'text-white/55 hover:bg-white/10 hover:text-white',
-                )}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onChangeSettings({ viewZoom: z })
-                }}
-              >
-                {z}×
-              </button>
-            )
-          })}
+        <div className="absolute right-3 bottom-14 z-10 flex flex-col items-end gap-1">
+          <div className="flex items-center gap-1 rounded-lg bg-black/45 p-1 ring-1 ring-white/10 backdrop-blur">
+            <span className="px-1.5 text-[10px] tracking-wide text-white/50 uppercase">Zoom</span>
+            {ZOOM_PRESETS.map((z) => {
+              const active = Math.abs(settings.viewZoom - z) < 0.05
+              const clips = z > fitZoom + 0.05
+              const recommended = Math.abs(z - recommendedZoom) < 0.05
+              return (
+                <button
+                  key={z}
+                  type="button"
+                  title={
+                    clips
+                      ? `Se corta el spray (~máx ${fitZoom}× para ${bullets} balas)`
+                      : recommended
+                        ? 'Recomendado: se ve entero y grande'
+                        : undefined
+                  }
+                  className={cn(
+                    'rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums transition-colors',
+                    active
+                      ? 'bg-cyan-500/30 text-cyan-100'
+                      : clips
+                        ? 'text-white/30 hover:bg-white/10 hover:text-white/70'
+                        : recommended
+                          ? 'text-cyan-200/80 ring-1 ring-cyan-400/35 hover:bg-cyan-500/15'
+                          : 'text-white/55 hover:bg-white/10 hover:text-white',
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onChangeSettings({ viewZoom: z })
+                  }}
+                >
+                  {z}×
+                </button>
+              )
+            })}
+          </div>
+          {settings.viewZoom > fitZoom + 0.05 && (
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-200/90 ring-1 ring-amber-400/25">
+              Este zoom corta el spray · mejor {recommendedZoom}×
+            </span>
+          )}
         </div>
       )}
 

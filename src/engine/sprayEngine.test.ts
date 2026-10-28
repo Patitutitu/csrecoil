@@ -7,6 +7,7 @@ import {
   degToCm,
   degToCounts,
   displayPixelsPerDegree,
+  maxFitViewZoom,
   mouseDeltaToViewDeg,
   pixelsPerDegree,
 } from '@/lib/units'
@@ -140,7 +141,7 @@ describe('viewport simulador', () => {
     expect(Math.abs(tip.y - view.anchor.y)).toBeLessThan(540 * 0.35)
   })
 
-  it('viewZoom agranda el gráfico sin mover el ancla (0,0)', () => {
+  it('viewZoom agranda el gráfico; sin path el ancla queda al centro', () => {
     const view = computeViewport(960, 540, [], {
       resWidth: 1920,
       resHeight: 1080,
@@ -149,6 +150,29 @@ describe('viewport simulador', () => {
     })
     expect(view.anchor).toEqual({ x: 480, y: 270 })
     expect(view.ppd).toBeCloseTo(pixelsPerDegree(1920, 1080, 90) * 0.5 * 2.5, 5)
+  })
+
+  it('con zoom alto el ancla sube para que el pull-down entre en pantalla', () => {
+    const path = compensationPath(WEAPON_BY_ID.ak47, 30)
+    const view = computeViewport(1000, 562, path, {
+      resWidth: 1600,
+      resHeight: 900,
+      fov: 90,
+      viewZoom: 4,
+    })
+    // Preferiría y=281; al no entrar, baja el ancla? No: sube (menor y) para dar espacio abajo.
+    expect(view.anchor.y).toBeLessThan(562 / 2)
+    const tip = toScreen(view, path[path.length - 1])
+    expect(tip.y).toBeLessThanOrEqual(562 - 50)
+    const origin = toScreen(view, { x: 0, y: 0 })
+    expect(origin.y).toBeGreaterThan(40)
+  })
+
+  it('en canvas chico el zoom de encaje baja; en ~1000×562 a 1600×900 entra hasta 4×', () => {
+    const path = compensationPath(WEAPON_BY_ID.ak47, 30)
+    expect(maxFitViewZoom(1000, 562, path, 1600, 900, 90)).toBeGreaterThanOrEqual(3.5)
+    // Mitad de alto: hay que bajar el zoom
+    expect(maxFitViewZoom(1000, 280, path, 1600, 900, 90)).toBeLessThan(3)
   })
 })
 

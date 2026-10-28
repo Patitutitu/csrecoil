@@ -69,6 +69,43 @@ export function displayPixelsPerDegree(
   return game * (canvasWidth / Math.max(1, resWidth)) * zoom
 }
 
+/**
+ * Zoom máximo para que el path entre en el canvas (con margen), sin cambiar la escala
+ * base de CS2. Por encima de esto el spray se corta aunque se mueva el ancla.
+ */
+export function maxFitViewZoom(
+  canvasWidth: number,
+  canvasHeight: number,
+  path: Vec2[],
+  resWidth: number,
+  resHeight: number,
+  fovSetting = 90,
+  padding = 56,
+): number {
+  if (path.length === 0) return 4
+  const base = displayPixelsPerDegree(canvasWidth, resWidth, resHeight, fovSetting, 1)
+  if (base <= 0) return 1
+  let minX = 0
+  let maxX = 0
+  let minY = 0
+  let maxY = 0
+  for (const p of path) {
+    // offsets de pantalla a ppd=1 (y de canvas crece hacia abajo; path.y positivo = arriba en mundo)
+    minX = Math.min(minX, p.x)
+    maxX = Math.max(maxX, p.x)
+    minY = Math.min(minY, -p.y)
+    maxY = Math.max(maxY, -p.y)
+  }
+  const spanX = maxX - minX
+  const spanY = maxY - minY
+  const availW = Math.max(1, canvasWidth - 2 * padding)
+  const availH = Math.max(1, canvasHeight - 2 * padding)
+  const zx = spanX > 1e-6 ? availW / (spanX * base) : 4
+  const zy = spanY > 1e-6 ? availH / (spanY * base) : 4
+  const z = Math.min(zx, zy, 4)
+  return Math.max(1, Math.round(z * 10) / 10)
+}
+
 /** Cantidad de balas del ejercicio. En modo `custom` usa `customBullets` (acotado al cargador). */
 export function bulletsForMode(weapon: WeaponDef, mode: DrillMode, customBullets = 15): number {
   switch (mode) {
