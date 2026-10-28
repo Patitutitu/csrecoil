@@ -493,7 +493,8 @@ export function PlayArea({
       ref={wrapperRef}
       className={cn(
         'relative w-full overflow-hidden rounded-xl border border-white/10 bg-[#0a0b12] shadow-2xl shadow-black/40',
-        'aspect-[4/5] sm:aspect-[16/10]',
+        // Más alto que ancho para leer bien el pull-down y los impactos.
+        'min-h-[560px] aspect-[3/4] sm:min-h-[680px] sm:aspect-[5/4] lg:min-h-[760px] lg:aspect-[4/3]',
         lockState === 'locked' ? 'cursor-none' : 'cursor-crosshair',
       )}
     >

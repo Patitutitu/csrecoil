@@ -82,12 +82,13 @@ export function computeViewport(width: number, height: number, path: Vec2[]): Vi
     minY = Math.min(minY, p.y)
     maxY = Math.max(maxY, p.y)
   }
-  // Transfer: offsets en y=0, path puede ir más ancho
-  const spanY = Math.max(maxDown * 1.15, Math.max(maxY - minY, 3) * 1.1, 3)
-  const spanX = Math.max(maxSide * 1.35, 2.5)
-  const padTop = height * 0.14
-  const padBottom = height * 0.1
-  const padX = width * 0.08
+  // Transfer: offsets en y=0, path puede ir más ancho.
+  // Menos padding vertical → el pattern y los impactos usan casi toda la altura.
+  const spanY = Math.max(maxDown * 1.08, Math.max(maxY - minY, 3) * 1.05, 3)
+  const spanX = Math.max(maxSide * 1.25, 2.5)
+  const padTop = Math.max(36, height * 0.06)
+  const padBottom = Math.max(64, height * 0.11) // deja aire para A/D y la barra de 1°
+  const padX = width * 0.06
   const ppd = Math.min((height - padTop - padBottom) / spanY, (width - 2 * padX) / (2 * spanX))
   return { anchor: { x: width / 2, y: padTop }, ppd }
 }
@@ -123,9 +124,11 @@ export function drawFrame(f: Frame): void {
   if (finished || f.reveal) {
     drawTrace(ctx, view, engine)
     drawErrorLinks(ctx, view, engine)
-    if (engine.game === 'transfer' || engine.game === 'recoil') {
-      drawImpacts(ctx, view, engine)
-    }
+  }
+
+  // Impactos visibles en vivo (y al final) para ver dónde pegó cada bala.
+  if (engine.game === 'transfer' || engine.game === 'recoil') {
+    drawImpacts(ctx, view, engine)
   }
 
   drawPulses(ctx, view, f.pulses, now)
@@ -333,8 +336,13 @@ function drawImpacts(ctx: CanvasRenderingContext2D, view: Viewport, engine: Spra
   for (const s of engine.shots) {
     const p = toScreen(view, s.impact)
     ctx.fillStyle = GRADE_COLORS[s.grade]
-    ctx.globalAlpha = 0.85
-    ctx.fillRect(p.x - 3, p.y - 3, 6, 6)
+    ctx.globalAlpha = 0.9
+    ctx.strokeStyle = 'rgba(10, 11, 18, 0.85)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.rect(p.x - 4, p.y - 4, 8, 8)
+    ctx.fill()
+    ctx.stroke()
   }
   ctx.restore()
 }

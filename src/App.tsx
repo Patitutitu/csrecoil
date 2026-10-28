@@ -296,7 +296,7 @@ export default function App() {
     <TooltipProvider>
       <div className="min-h-screen bg-[#07080d] text-zinc-100">
         <header className="sticky top-0 z-20 border-b border-white/5 bg-[#07080d]/80 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+          <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-4 py-3">
             <div className="flex size-9 items-center justify-center rounded-lg bg-fuchsia-500/20 ring-1 ring-fuchsia-400/40">
               <Crosshair className="size-5 text-fuchsia-300" />
             </div>
@@ -325,8 +325,8 @@ export default function App() {
           </div>
         </header>
 
-        <main className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="flex min-w-0 flex-col gap-4">
+        <main className="mx-auto grid max-w-[1600px] gap-4 px-3 py-3 sm:px-4 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="flex min-w-0 flex-col gap-3">
             {warmup && (
               <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
                 Calentamiento {warmup.i + 1}/{warmup.steps.length}: terminá la ráfaga para pasar al siguiente ejercicio.
@@ -392,7 +392,7 @@ export default function App() {
           </aside>
         </main>
 
-        <footer className="mx-auto max-w-7xl px-4 pb-6 text-[11px] text-white/35">
+        <footer className="mx-auto max-w-[1600px] px-4 pb-6 text-[11px] text-white/35">
           Cadencia real de CS2 (no se modifica). Disparar por encima del 34 % de velocidad máxima agrega dispersión.
           Click derecho libera el mouse. Tab: minijuego · Q/W/E: presets · C: custom · +/−: balas · G: guía · R: reiniciar ·
           A/D: strafe.
