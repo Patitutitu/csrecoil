@@ -9,6 +9,7 @@ interface WeaponInfoProps {
   weapon: WeaponDef
   mode: DrillMode
   settings: Settings
+  customBullets?: number
 }
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -21,8 +22,8 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   )
 }
 
-export function WeaponInfo({ weapon, mode, settings }: WeaponInfoProps) {
-  const bullets = bulletsForMode(weapon, mode)
+export function WeaponInfo({ weapon, mode, settings, customBullets = 15 }: WeaponInfoProps) {
+  const bullets = bulletsForMode(weapon, mode, customBullets)
   const path = compensationPath(weapon, bullets)
   const last = path[path.length - 1]
   const pullDownDeg = Math.max(...path.map((p) => -p.y))

@@ -22,7 +22,7 @@ export interface WeaponDef {
 }
 
 export type GameId = 'recoil' | 'transfer' | 'strafe'
-export type RecoilMode = 'first4' | 'first9' | 'full'
+export type RecoilMode = 'first4' | 'first9' | 'full' | 'custom'
 export type TransferMode = 't2' | 't3' | 't5'
 export type StrafeMode = 'tap' | 'burst'
 export type DrillMode = RecoilMode | TransferMode | StrafeMode

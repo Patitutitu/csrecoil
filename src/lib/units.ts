@@ -31,7 +31,8 @@ export function mouseDeltaToViewDeg(dx: number, dy: number, sensitivity: number)
   return { x: dx * k, y: -dy * k }
 }
 
-export function bulletsForMode(weapon: WeaponDef, mode: DrillMode): number {
+/** Cantidad de balas del ejercicio. En modo `custom` usa `customBullets` (acotado al cargador). */
+export function bulletsForMode(weapon: WeaponDef, mode: DrillMode, customBullets = 15): number {
   switch (mode) {
     case 'first4':
       return Math.min(4, weapon.magazine)
@@ -39,6 +40,8 @@ export function bulletsForMode(weapon: WeaponDef, mode: DrillMode): number {
       return Math.min(9, weapon.magazine)
     case 'full':
       return weapon.magazine
+    case 'custom':
+      return Math.max(1, Math.min(weapon.magazine, Math.round(customBullets)))
     case 't2':
     case 't3':
     case 't5':
@@ -48,6 +51,14 @@ export function bulletsForMode(weapon: WeaponDef, mode: DrillMode): number {
     case 'burst':
       return Math.min(4, weapon.magazine)
   }
+}
+
+/** Presets rápidos del spray → cantidad de balas (o null = cargador completo). */
+export function presetBullets(mode: DrillMode, magazine: number): number | null {
+  if (mode === 'first4') return Math.min(4, magazine)
+  if (mode === 'first9') return Math.min(9, magazine)
+  if (mode === 'full') return magazine
+  return null
 }
 
 /** Trayectoria ideal del mouse en grados: el vector opuesto al patrón de impactos. */

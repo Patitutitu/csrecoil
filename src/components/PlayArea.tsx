@@ -26,6 +26,7 @@ export interface PlayAreaProps {
   game: GameId
   settings: Settings
   retryToken: number
+  customBullets?: number
   seed?: number
   ghost?: RunResult | null
   onFinished: (result: RunResult) => void
@@ -57,6 +58,7 @@ export function PlayArea({
   game,
   settings,
   retryToken,
+  customBullets = 15,
   seed: seedProp,
   ghost,
   onFinished,
@@ -72,7 +74,15 @@ export function PlayArea({
   const onFinishedRef = useRef(onFinished)
   const seedRef = useRef(seedProp ?? randomSeed())
   const ghostRef = useRef(ghost)
-  const optsRef = useRef({ weapon, mode, guide, game, sensitivity: settings.sensitivity, dpi: settings.dpi })
+  const optsRef = useRef({
+    weapon,
+    mode,
+    guide,
+    game,
+    sensitivity: settings.sensitivity,
+    dpi: settings.dpi,
+    customBullets,
+  })
 
   const [lockState, setLockState] = useState<LockState>('unlocked')
   const [uiStatus, setUiStatus] = useState<UiStatus>('idle')
@@ -87,7 +97,15 @@ export function PlayArea({
   useEffect(() => {
     onFinishedRef.current = onFinished
     ghostRef.current = ghost
-    optsRef.current = { weapon, mode, guide, game, sensitivity: settings.sensitivity, dpi: settings.dpi }
+    optsRef.current = {
+      weapon,
+      mode,
+      guide,
+      game,
+      sensitivity: settings.sensitivity,
+      dpi: settings.dpi,
+      customBullets,
+    }
     if (seedProp !== undefined) seedRef.current = seedProp
   })
 
@@ -121,6 +139,7 @@ export function PlayArea({
         game: o.game,
         seed,
         movement,
+        customBullets: o.customBullets,
       })
     }
     pulsesRef.current = []
@@ -131,7 +150,7 @@ export function PlayArea({
 
   useEffect(() => {
     resetEngine()
-  }, [weapon, mode, guide, game, settings.sensitivity, settings.dpi, retryToken, seedProp, resetEngine])
+  }, [weapon, mode, guide, game, settings.sensitivity, settings.dpi, customBullets, retryToken, seedProp, resetEngine])
 
   useEffect(() => {
     audioEngine.enabled = settings.audio
@@ -466,7 +485,7 @@ export function PlayArea({
     }
   }, [game, handleSprayEvents, handleStrafeEvents, settings.ghost])
 
-  const bullets = bulletsForMode(weapon, mode)
+  const bullets = bulletsForMode(weapon, mode, customBullets)
   const gameLabel = game === 'recoil' ? 'Spray' : game === 'transfer' ? 'Transfer' : 'Strafe'
 
   return (

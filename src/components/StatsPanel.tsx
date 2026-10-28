@@ -20,6 +20,7 @@ const MODE_SHORT: Record<string, string> = {
   first4: '4',
   first9: '9',
   full: 'Full',
+  custom: 'Custom',
   t2: 'T2',
   t3: 'T3',
   t5: 'T5',
@@ -75,7 +76,8 @@ export function StatsPanel({ history, weaponId, mode, guide, game, onClear }: St
                     <span className={`w-4 text-base font-black ${gradeColor(r.grade)}`}>{r.grade}</span>
                     <span className="flex-1 truncate text-white/80">
                       {GAME_SHORT[r.game]} · {WEAPON_BY_ID[r.weaponId]?.short ?? r.weaponId} ·{' '}
-                      {MODE_SHORT[r.mode] ?? r.mode} · {GUIDE_SHORT[r.guide]}
+                      {r.mode === 'custom' ? `${r.bullets}b` : (MODE_SHORT[r.mode] ?? r.mode)} ·{' '}
+                      {GUIDE_SHORT[r.guide]}
                       {!r.completed && <span className="text-amber-300/80"> · cortada</span>}
                     </span>
                     <span className="tabular-nums text-white/60">{Math.round(r.accuracy * 100)}%</span>

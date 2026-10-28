@@ -128,10 +128,13 @@ export function bestRun(
   mode: DrillMode,
   guide: GuideLevel,
   game: GameId = 'recoil',
+  bullets?: number,
 ): RunResult | undefined {
   let best: RunResult | undefined
   for (const r of history) {
     if (r.weaponId !== weaponId || r.mode !== mode || r.guide !== guide || r.game !== game) continue
+    // En custom, el récord es por cantidad de balas (12 ≠ 20).
+    if (mode === 'custom' && bullets !== undefined && r.bullets !== bullets) continue
     if (!best || r.score > best.score) best = r
   }
   return best

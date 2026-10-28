@@ -31,6 +31,7 @@ export const RECOIL_MODES: { id: RecoilMode; label: string; key: string; hint: s
   { id: 'first4', label: '4 balas', key: 'Q', hint: 'El tap controlado: casi todo es pull-down' },
   { id: 'first9', label: '9 balas', key: 'W', hint: 'La ráfaga que define la mayoría de los duelos' },
   { id: 'full', label: 'Cargador', key: 'E', hint: 'El patrón completo, con todos los quiebres laterales' },
+  { id: 'custom', label: 'Custom', key: 'C', hint: 'Elegí cuántas balas practicar (1 hasta el cargador)' },
 ]
 
 export const TRANSFER_MODES: { id: TransferMode; label: string; key: string; hint: string }[] = [

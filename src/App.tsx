@@ -24,6 +24,8 @@ interface SessionState {
   mode: DrillMode
   guide: GuideLevel
   game: GameId
+  /** Balas del modo custom (1..magazine). */
+  customBullets: number
   seed?: number
   daily?: string
 }
@@ -35,11 +37,18 @@ function readSession(): SessionState {
       const s = JSON.parse(raw) as Partial<SessionState>
       const game = GAMES.some((g) => g.id === s.game) ? (s.game as GameId) : 'recoil'
       const modes = modesForGame(game)
+      const weaponId = WEAPONS.some((w) => w.id === s.weaponId) ? (s.weaponId as string) : WEAPONS[0].id
+      const mag = WEAPONS.find((w) => w.id === weaponId)?.magazine ?? 30
+      const customBullets =
+        typeof s.customBullets === 'number' && s.customBullets >= 1
+          ? Math.min(mag, Math.round(s.customBullets))
+          : 15
       return {
-        weaponId: WEAPONS.some((w) => w.id === s.weaponId) ? (s.weaponId as string) : WEAPONS[0].id,
+        weaponId,
         mode: modes.some((m) => m.id === s.mode) ? (s.mode as DrillMode) : modes[0].id,
         guide: GUIDES.some((g) => g.id === s.guide) ? (s.guide as GuideLevel) : 'guided',
         game,
+        customBullets,
         seed: typeof s.seed === 'number' ? s.seed : undefined,
         daily: typeof s.daily === 'string' ? s.daily : undefined,
       }
@@ -58,6 +67,7 @@ function readSession(): SessionState {
         mode: c.mode,
         guide: c.guide,
         game: c.game,
+        customBullets: 15,
         seed: c.seed,
         daily: c.day,
       }
@@ -65,7 +75,7 @@ function readSession(): SessionState {
   } catch {
     // ignore
   }
-  return { weaponId: WEAPONS[0].id, mode: 'first4', guide: 'guided', game: 'recoil' }
+  return { weaponId: WEAPONS[0].id, mode: 'first4', guide: 'guided', game: 'recoil', customBullets: 15 }
 }
 
 export default function App() {
@@ -78,7 +88,8 @@ export default function App() {
   const [warmup, setWarmup] = useState<{ steps: SessionState[]; i: number } | null>(null)
 
   const weapon = WEAPONS.find((w) => w.id === session.weaponId) ?? WEAPONS[0]
-  const { mode, guide, game } = session
+  const { mode, guide, game, customBullets } = session
+  const activeBullets = bulletsForMode(weapon, mode, customBullets)
 
   useEffect(() => {
     try {
@@ -94,11 +105,32 @@ export default function App() {
   }, [])
 
   const setWeapon = useCallback(
-    (w: WeaponDef) => patchSession((s) => ({ ...s, weaponId: w.id, seed: undefined, daily: undefined })),
+    (w: WeaponDef) =>
+      patchSession((s) => ({
+        ...s,
+        weaponId: w.id,
+        customBullets: Math.min(w.magazine, s.customBullets),
+        seed: undefined,
+        daily: undefined,
+      })),
     [patchSession],
   )
   const setMode = useCallback(
     (m: DrillMode) => patchSession((s) => ({ ...s, mode: m, seed: undefined, daily: undefined })),
+    [patchSession],
+  )
+  const setCustomBullets = useCallback(
+    (n: number) =>
+      patchSession((s) => {
+        const mag = WEAPONS.find((w) => w.id === s.weaponId)?.magazine ?? 30
+        return {
+          ...s,
+          mode: 'custom',
+          customBullets: Math.max(1, Math.min(mag, Math.round(n))),
+          seed: undefined,
+          daily: undefined,
+        }
+      }),
     [patchSession],
   )
   const setGuide = useCallback(
@@ -138,7 +170,7 @@ export default function App() {
     [addRun, warmup],
   )
 
-  const best = bestRun(history, weapon.id, mode, guide, game)
+  const best = bestRun(history, weapon.id, mode, guide, game, activeBullets)
   const daily = useMemo(() => dailyChallenge(), [])
   const dailyDone = history.some(
     (r) => r.seed === daily.seed && r.game === daily.game && r.weaponId === daily.weaponId && utcDayKey(new Date(r.date)) === daily.day,
@@ -147,14 +179,15 @@ export default function App() {
   const playDaily = useCallback(() => {
     const c = dailyChallenge()
     setWarmup(null)
-    setSession({
+    setSession((s) => ({
       weaponId: c.weaponId,
       mode: c.mode,
       guide: c.guide,
       game: c.game,
+      customBullets: s.customBullets,
       seed: c.seed,
       daily: c.day,
-    })
+    }))
     setRetryToken((t) => t + 1)
     setLastResult(null)
   }, [])
@@ -171,9 +204,9 @@ export default function App() {
 
   const startWarmup = useCallback(() => {
     const steps: SessionState[] = [
-      { weaponId: 'ak47', mode: 'first4' as RecoilMode, guide: 'guided', game: 'recoil' },
-      { weaponId: 'm4a4', mode: 'first9' as RecoilMode, guide: 'fade', game: 'recoil' },
-      { weaponId: 'ak47', mode: 't2', guide: 'guided', game: 'transfer' },
+      { weaponId: 'ak47', mode: 'first4' as RecoilMode, guide: 'guided', game: 'recoil', customBullets: 15 },
+      { weaponId: 'm4a4', mode: 'first9' as RecoilMode, guide: 'fade', game: 'recoil', customBullets: 15 },
+      { weaponId: 'ak47', mode: 't2', guide: 'guided', game: 'transfer', customBullets: 15 },
     ]
     setWarmup({ steps, i: 0 })
     setSession(steps[0])
@@ -198,11 +231,23 @@ export default function App() {
         case 'q':
         case 'w':
         case 'e': {
-          const modes = modesForGame(game)
+          const modes = modesForGame(game).filter((m) => m.id !== 'custom')
           const idx = k === 'q' ? 0 : k === 'w' ? 1 : 2
           if (modes[idx]) setMode(modes[idx].id)
           break
         }
+        case 'c':
+          if (game === 'recoil') setMode('custom')
+          break
+        case '-':
+        case '[':
+          if (game === 'recoil') setCustomBullets(customBullets - 1)
+          break
+        case '+':
+        case '=':
+        case ']':
+          if (game === 'recoil') setCustomBullets(customBullets + 1)
+          break
         case 'tab':
           e.preventDefault()
           patchSession((s) => {
@@ -227,13 +272,25 @@ export default function App() {
           break
         case ' ':
           e.preventDefault()
-          audioEngine.preview(weapon.cycleMs, bulletsForMode(weapon, mode))
+          audioEngine.preview(weapon.cycleMs, bulletsForMode(weapon, mode, customBullets))
           break
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [settingsOpen, settings.audio, updateSettings, weapon, mode, game, setWeapon, setMode, patchSession])
+  }, [
+    settingsOpen,
+    settings.audio,
+    updateSettings,
+    weapon,
+    mode,
+    game,
+    customBullets,
+    setWeapon,
+    setMode,
+    setCustomBullets,
+    patchSession,
+  ])
 
   return (
     <TooltipProvider>
@@ -287,6 +344,7 @@ export default function App() {
               game={game}
               settings={settings}
               retryToken={retryToken}
+              customBullets={customBullets}
               seed={session.seed}
               ghost={settings.ghost ? best : null}
               onFinished={onFinished}
@@ -299,7 +357,7 @@ export default function App() {
                 sensitivity={settings.sensitivity}
                 dpi={settings.dpi}
               />
-              <WeaponInfo weapon={weapon} mode={mode} settings={settings} />
+              <WeaponInfo weapon={weapon} mode={mode} settings={settings} customBullets={customBullets} />
             </div>
           </section>
 
@@ -316,10 +374,12 @@ export default function App() {
               mode={mode}
               guide={guide}
               game={game}
+              customBullets={customBullets}
               onWeapon={setWeapon}
               onMode={setMode}
               onGuide={setGuide}
               onGame={setGame}
+              onCustomBullets={setCustomBullets}
             />
             <StatsPanel
               history={history}
@@ -334,7 +394,8 @@ export default function App() {
 
         <footer className="mx-auto max-w-7xl px-4 pb-6 text-[11px] text-white/35">
           Cadencia real de CS2 (no se modifica). Disparar por encima del 34 % de velocidad máxima agrega dispersión.
-          Click derecho libera el mouse. Tab: minijuego · Q/W/E: ejercicio · G: guía · R: reiniciar · A/D: strafe.
+          Click derecho libera el mouse. Tab: minijuego · Q/W/E: presets · C: custom · +/−: balas · G: guía · R: reiniciar ·
+          A/D: strafe.
         </footer>
       </div>
     </TooltipProvider>

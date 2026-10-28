@@ -155,6 +155,28 @@ describe('SprayEngine', () => {
     expect(e.result?.maxCombo).toBe(9)
   })
 
+  it('modo custom respeta la cantidad elegida (acotada al cargador)', () => {
+    const e = new SprayEngine({
+      weapon: WEAPON_BY_ID.ak47,
+      mode: 'custom',
+      guide: 'guided',
+      sensitivity: 1,
+      dpi: 800,
+      customBullets: 12,
+    })
+    expect(e.bullets).toBe(12)
+    expect(e.path).toHaveLength(12)
+    const over = new SprayEngine({
+      weapon: WEAPON_BY_ID.m4a1s,
+      mode: 'custom',
+      guide: 'guided',
+      sensitivity: 1,
+      dpi: 800,
+      customBullets: 99,
+    })
+    expect(over.bullets).toBe(20)
+  })
+
   it('spray transfer pone objetivos en X y pide 4 balas por pecho', () => {
     const e = new SprayEngine({
       weapon: WEAPON_BY_ID.ak47,

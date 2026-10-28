@@ -32,8 +32,10 @@ export interface EngineOptions {
   game?: GameId
   seed?: number
   movement?: Movement | null
-  /** Fuerza la cantidad de balas (ráfagas del modo strafe). */
+  /** Fuerza la cantidad de balas (ráfagas del modo strafe / override). */
   bullets?: number
+  /** Cantidad elegida en modo custom del spray. */
+  customBullets?: number
   /** Grupo de las balas (ventana de disparo en strafe). */
   group?: number
 }
@@ -104,7 +106,10 @@ export class SprayEngine {
     this.movement = opts.movement ?? null
     this.group = opts.group ?? 0
     this.rnd = mulberry32(this.seed + this.group * 7919)
-    this.bullets = Math.min(opts.bullets ?? bulletsForMode(opts.weapon, opts.mode), opts.weapon.magazine)
+    this.bullets = Math.min(
+      opts.bullets ?? bulletsForMode(opts.weapon, opts.mode, opts.customBullets),
+      opts.weapon.magazine,
+    )
     this.compensation = compensationPath(opts.weapon, this.bullets)
     if (this.game === 'transfer') {
       const count = targetsForMode(this.mode as TransferMode, this.weapon)
