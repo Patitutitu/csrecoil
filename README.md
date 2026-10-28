@@ -53,7 +53,7 @@ src/
 
 | Arma | RPM | ms/bala | Cargador | Origen del patrón |
 | --- | --- | --- | --- | --- |
-| AK-47 | 600 | 100 | 30 | Trayectoria de compensación de Leetify (30 balas, trazada cuadro a cuadro desde su animación), escalada a la subida medida de 11,18° |
+| AK-47 | 600 | 100 | 30 | Gráfico por bala de Leetify (30 puntos; el orden se reconstruye siguiendo las líneas entre puntos), escalado a la subida medida de 11,18° |
 | M4A4 | 667 | 90 | 30 | Medición por bala en grados de imbaboost |
 | M4A1-S | 600 | 100 | 20 | Medición por bala en grados de imbaboost |
 | Galil AR | 667 | 90 | 35 | Forma de [Artanis-RCS](https://github.com/ArtanisInc/Artanis-RCS), escalada a la altura publicada por csstats.gg (7,31°) |
@@ -61,7 +61,7 @@ src/
 | SG 553 | 545 | 110 | 30 | Ídem, altura 8,59° |
 | AUG | 600 | 100 | 30 | Ídem, altura 7,84° |
 
-Validación cruzada: para M4A4 y M4A1-S la forma de Artanis-RCS escalada coincide con la medición directa dentro de ~0,1° por bala. La AK-47 usa la trayectoria de Leetify: al escalarla por su altura (11,18°) el ancho resultante es 6,7°, consistente con los 7,1°-7,3° publicados, y la secuencia izquierda-derecha-izquierda coincide con las demás fuentes.
+Validación cruzada: para M4A4 y M4A1-S la forma de Artanis-RCS escalada coincide con la medición directa dentro de ~0,1° por bala. La AK-47 usa el gráfico por bala de Leetify: al escalarlo por su altura (11,18°) el ancho resultante es 6,2°, consistente con los 7,1°-7,3° publicados, y la secuencia izquierda-derecha-izquierda coincide con las demás fuentes.
 
 Si Valve ajusta un patrón, basta con reemplazar el vector del arma en ese archivo.
 

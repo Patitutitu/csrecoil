@@ -21,17 +21,18 @@ describe('datos de armas', () => {
     expect(WEAPON_BY_ID.galil.magazine).toBe(35)
   })
 
-  it('la AK sube ~11° con pico en la bala 28 y deriva izquierda-derecha-izquierda', () => {
+  it('la AK sube ~11° con pico en la bala 26 y deriva izquierda-derecha-izquierda', () => {
     const ak = WEAPON_BY_ID.ak47
     const ys = ak.pattern.map((p) => p.y)
     const peak = ys.indexOf(Math.max(...ys)) + 1
-    expect(peak).toBe(28)
+    expect(peak).toBe(26)
     expect(Math.max(...ys)).toBeGreaterThan(11)
     expect(Math.max(...ys)).toBeLessThan(11.4)
-    // impactos: primero a la izquierda (balas 5-8), luego a la derecha (10-15), luego a la izquierda (20-27)
+    // impactos: primero a la izquierda (balas 5-8), luego a la derecha (10-15), luego a la izquierda (20-26) y cierra a la derecha (30)
     expect(ak.pattern[6].x).toBeLessThan(-1)
-    expect(ak.pattern[13].x).toBeGreaterThan(4)
-    expect(ak.pattern[21].x).toBeLessThan(-2.4)
+    expect(ak.pattern[13].x).toBeGreaterThan(3.5)
+    expect(ak.pattern[21].x).toBeLessThan(-2.2)
+    expect(ak.pattern[29].x).toBeGreaterThan(2)
   })
 })
 
