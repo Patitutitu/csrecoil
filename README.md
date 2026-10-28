@@ -73,6 +73,7 @@ Cómo se midieron los videos (mapa Recoil Master, 1600x900 a 60 fps, disparando 
 - La mira de recoil verde marca la dirección de cada bala sin la dispersión aleatoria. La vista también se mueve (view punch), así que la rotación de la cámara se resuelve en 3D con dos referencias fijas de la pared. La focal de 600 px (FOV horizontal de 106,26° en 16:9) se confirmó ajustándola: el residuo es de menos de 0,2 px.
 - Los disparos se detectan por el salto de la cámara. La grilla encaja con la cadencia oficial en todas las armas (AK, AUG y M4A1-S 100 ms; FAMAS, Galil y M4A4 90 ms; MAC-10 75 ms; MP9 70 ms). Cada bala se mide en el último frame antes del disparo siguiente.
 - Contra los impactos reales en la pared, el desvío medio es de ±0,2°, que es la dispersión normal, así que no hay sesgo sistemático.
+- AUG con mira: en el visor (focal de 1448 px, FOV de 45°) la cadencia también es de 100 ms y el patrón coincide con el del AUG sin mira, a 0,4° de media. Por eso no se agregó una variante aparte.
 - Diferencias con las fuentes anteriores: los patrones son entre 3 y 7 % más altos (AK 11,76° frente a 11,18°). Además, imbaboost tenía la M4A4 y la M4A1-S corridas una bala.
 
 Validación cruzada de las armas que no tienen video:
@@ -85,4 +86,4 @@ Si Valve ajusta un patrón, basta con reemplazar el vector del arma en ese archi
 
 ## Fuera de alcance (por ahora)
 
-Modo lento (a propósito), objetivos/disparos, multijugador, backend, variantes con mira (SG 553; el video del AUG con mira está pendiente de calibrar) y M4A1-S sin silenciador: no hay una fuente en grados para esos patrones.
+Modo lento (a propósito), objetivos/disparos, multijugador, backend, la SG 553 con mira y M4A1-S sin silenciador: no hay una fuente en grados para esos patrones.
