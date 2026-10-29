@@ -155,6 +155,11 @@ export function PlayArea({
   }, [seedProp])
 
   useEffect(() => {
+    // Cambiar balas/arma/modo/guía reinicia el ejercicio: liberar el mouse
+    // para que se pueda usar la UI (+/−, presets) sin quedar atrapado.
+    if (document.pointerLockElement) document.exitPointerLock()
+    lockRef.current = 'unlocked'
+    setLockState('unlocked')
     resetEngine()
   }, [weapon, mode, guide, game, settings.sensitivity, settings.dpi, customBullets, retryToken, seedProp, resetEngine])
 

@@ -269,36 +269,36 @@ export function Controls({
         </CardContent>
       </Card>
 
-      {game !== 'strafe' && (
-        <Card className="gap-3 py-4">
-          <CardHeader className="px-4">
-            <CardTitle>Guía</CardTitle>
-            <CardDescription>De ver el patrón a memorizarlo</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-1.5 px-4">
-            {GUIDES.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                title={g.hint}
-                onClick={() => onGuide(g.id)}
-                className={cn(
-                  'flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs transition-colors',
-                  g.id === guide
-                    ? 'border-fuchsia-400/60 bg-fuchsia-500/15 text-white'
-                    : 'border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.07]',
-                )}
-              >
-                <g.icon className="size-4" />
-                {g.label}
-              </button>
-            ))}
-            <p className="col-span-3 mt-1 text-[11px] text-white/50">
-              {GUIDES.find((g) => g.id === guide)?.hint} · <kbd className="font-mono">G</kbd> alterna
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <Card className="gap-3 py-4">
+        <CardHeader className="px-4">
+          <CardTitle>Guía</CardTitle>
+          <CardDescription>
+            {game === 'strafe' ? 'Guía del spray en la mira central' : 'De ver el patrón a memorizarlo'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-3 gap-1.5 px-4">
+          {GUIDES.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              title={g.hint}
+              onClick={() => onGuide(g.id)}
+              className={cn(
+                'flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs transition-colors',
+                g.id === guide
+                  ? 'border-fuchsia-400/60 bg-fuchsia-500/15 text-white'
+                  : 'border-white/10 bg-white/[0.03] text-white/80 hover:bg-white/[0.07]',
+              )}
+            >
+              <g.icon className="size-4" />
+              {g.label}
+            </button>
+          ))}
+          <p className="col-span-3 mt-1 text-[11px] text-white/50">
+            {GUIDES.find((g) => g.id === guide)?.hint} · <kbd className="font-mono">G</kbd> alterna
+          </p>
+        </CardContent>
+      </Card>
     </>
   )
 }

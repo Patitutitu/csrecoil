@@ -174,7 +174,8 @@ export function drawFrame(f: Frame): void {
   }
 
   // Impactos al frente (estilo SHOW IMPACTS): se leen sobre el path/láser.
-  if (engine.game === 'transfer' || engine.game === 'recoil') {
+  // Incluye ráfagas del Strafe (el burst interno también usa game 'strafe').
+  if (engine.game === 'transfer' || engine.game === 'recoil' || engine.game === 'strafe') {
     drawImpacts(ctx, view, engine)
   }
 
@@ -824,6 +825,19 @@ function drawStrafeLanes(
   ctx.restore()
 }
 
+function burstGuideAlpha(burst: SprayEngine, now: number): number {
+  if (burst.guide === 'guided') return 1
+  if (burst.guide === 'blind') return 0
+  if (burst.status === 'idle') return 1
+  if (burst.status === 'finished') return 0
+  const n = burst.bullets
+  const fadeStart = Math.max(1, Math.ceil(n * 0.25))
+  const fadeEnd = Math.max(fadeStart + 1, Math.ceil(n * 0.5))
+  const progress = (now - burst.t0) / burst.cycleMs
+  const k = 1 - (progress - fadeStart) / (fadeEnd - fadeStart)
+  return k < 0 ? 0 : k > 1 ? 1 : k
+}
+
 /** Panel central grande: mira + path + impactos como en CS2. */
 function drawStrafeMiraPanel(ctx: CanvasRenderingContext2D, layout: StrafeLayout, f: StrafeFrame): void {
   const { mira } = layout
@@ -834,16 +848,17 @@ function drawStrafeMiraPanel(ctx: CanvasRenderingContext2D, layout: StrafeLayout
   ctx.clip()
 
   if (engine.burst && engine.burst.status !== 'idle') {
+    const burst = engine.burst
     const panel: Frame = {
       ctx,
       width: mira.w,
       height: mira.h,
       now,
-      engine: engine.burst,
-      guideAlpha: 1,
+      engine: burst,
+      guideAlpha: burstGuideAlpha(burst, now),
       pulses: f.pulses,
       judgments: [],
-      reveal: engine.burst.status === 'finished',
+      reveal: burst.status === 'finished',
       speedFrac: f.speedFrac,
       resWidth: f.resWidth ?? 1920,
       resHeight: f.resHeight ?? 1080,

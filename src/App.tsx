@@ -123,13 +123,15 @@ export default function App() {
     (n: number) =>
       patchSession((s) => {
         const mag = WEAPONS.find((w) => w.id === s.weaponId)?.magazine ?? 30
-        return {
-          ...s,
-          mode: 'custom',
-          customBullets: Math.max(1, Math.min(mag, Math.round(n))),
-          seed: undefined,
-          daily: undefined,
+        const bullets = Math.max(1, Math.min(mag, Math.round(n)))
+        // En Spray, cambiar balas implica modo custom. En Strafe se queda en burst/tap.
+        if (s.game === 'recoil') {
+          return { ...s, mode: 'custom' as DrillMode, customBullets: bullets, seed: undefined, daily: undefined }
         }
+        if (s.game === 'strafe' && s.mode === 'tap') {
+          return { ...s, mode: 'burst' as DrillMode, customBullets: bullets, seed: undefined, daily: undefined }
+        }
+        return { ...s, customBullets: bullets, seed: undefined, daily: undefined }
       }),
     [patchSession],
   )
@@ -242,6 +244,7 @@ export default function App() {
         case '-':
         case '[':
           if (game === 'recoil' || (game === 'strafe' && mode === 'burst')) {
+            if (document.pointerLockElement) document.exitPointerLock()
             setCustomBullets(customBullets - 1)
           }
           break
@@ -249,6 +252,7 @@ export default function App() {
         case '=':
         case ']':
           if (game === 'recoil' || (game === 'strafe' && mode === 'burst')) {
+            if (document.pointerLockElement) document.exitPointerLock()
             setCustomBullets(customBullets + 1)
           }
           break
@@ -261,7 +265,6 @@ export default function App() {
           })
           break
         case 'g':
-          if (game === 'strafe') break
           patchSession((s) => {
             const i = GUIDES.findIndex((g) => g.id === s.guide)
             return { ...s, guide: GUIDES[(i + 1) % GUIDES.length].id, seed: undefined, daily: undefined }
