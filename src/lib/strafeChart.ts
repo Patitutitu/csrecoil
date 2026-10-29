@@ -17,16 +17,19 @@ export interface StrafeChart {
   durationMs: number
 }
 
-/** Margen para reaccionar y disparar quieto después del counter. */
+/** Margen extra en la ventana FIRE después de la última bala (reacción / soltar click). */
 const REACT_AND_FIRE_MS = 280
 const MIN_HOLD_MS = 420
-/** Duración visual/jugable de la nota de counter (~1 tap). */
-const COUNTER_BEATS = 1
+/**
+ * Nota visual de counter: ~tap corto.
+ * En CS2 el counter-strafe frena en ~80 ms; no bloqueamos el FIRE detrás de un beat entero.
+ */
+const COUNTER_MS = 140
 
 /**
- * Partitura: AAAAA → DDDD (counter) → FIRE quieto → DDDDD → AAAA (counter) → FIRE…
- * Nunca se dispara solo después de una tecla: siempre hace falta el counter-strafe.
- * En `burst`, `bulletsPerWindow` elige cuántas balas salen en cada FIRE (1…cargador).
+ * Partitura: AAAAA → (counter D + FIRE a la vez) → DDDDD → (counter A + FIRE)…
+ * Al soltar el strafe y tocar la tecla opuesta quedás quieto (~80 ms) y ya podés disparar:
+ * la ventana FIRE arranca con el counter, no después de esperar 400 ms.
  */
 export function buildStrafeChart(
   weapon: WeaponDef,
@@ -41,8 +44,7 @@ export function buildStrafeChart(
       ? 1
       : Math.max(1, Math.min(weapon.magazine, Math.round(bulletsPerWindow)))
   const windows = mode === 'tap' ? 10 : 8
-  const counterMs = COUNTER_BEATS * beatMs
-  const fireBeats = Math.max(1, Math.ceil(((perWindow - 1) * weapon.cycleMs + REACT_AND_FIRE_MS) / beatMs))
+  const fireMs = Math.max(weapon.cycleMs, (perWindow - 1) * weapon.cycleMs + REACT_AND_FIRE_MS)
   const minHoldBeats = Math.max(1, Math.ceil(MIN_HOLD_MS / beatMs))
   const leadInMs = beatMs * 4
   const notes: ChartNote[] = []
@@ -53,10 +55,10 @@ export function buildStrafeChart(
     const holdEnd = t + holdBeats * beatMs
     notes.push({ kind: 'hold', key, start: t, end: holdEnd })
     const opposite: StrafeKey = key === 'a' ? 'd' : 'a'
-    const counterEnd = holdEnd + counterMs
-    notes.push({ kind: 'counter', key: opposite, start: holdEnd, end: counterEnd, window: w })
-    const fireEnd = counterEnd + fireBeats * beatMs
-    notes.push({ kind: 'fire', start: counterEnd, end: fireEnd, bullets: perWindow, window: w })
+    // Counter y FIRE empiezan juntos: frenás con la opuesta y disparás quieto al toque.
+    notes.push({ kind: 'counter', key: opposite, start: holdEnd, end: holdEnd + COUNTER_MS, window: w })
+    const fireEnd = holdEnd + fireMs
+    notes.push({ kind: 'fire', start: holdEnd, end: fireEnd, bullets: perWindow, window: w })
     t = fireEnd
     key = opposite
   }

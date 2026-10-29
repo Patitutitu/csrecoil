@@ -73,11 +73,50 @@ describe('strafe chart', () => {
     expect(holds).toHaveLength(8)
     expect(counters).toHaveLength(8)
     expect(fires).toHaveLength(8)
-    // hold A → counter D → fire; el siguiente hold es D
+    // hold A → counter D y FIRE empiezan juntos (podés disparar al frenar)
     expect(counters[0].key).not.toBe(holds[0].key)
     expect(holds[1].key).toBe(counters[0].key)
     expect(holds[0].end).toBe(counters[0].start)
-    expect(counters[0].end).toBe(fires[0].start)
+    expect(fires[0].start).toBe(holds[0].end)
+    expect(fires[0].start).toBe(counters[0].start)
+  })
+
+  it('después del counter-strafe se puede disparar al toque (sin esperar el beat)', () => {
+    const move = new Movement(215)
+    const eng = new StrafeEngine({
+      weapon: WEAPON_BY_ID.ak47,
+      mode: 'tap',
+      guide: 'guided',
+      sensitivity: 1,
+      dpi: 800,
+      seed: 2,
+      movement: move,
+    })
+    eng.press(0)
+    const hold = eng.holdNotes[0]
+    const fire = eng.fireNotes[0]
+    const counter = eng.chart.notes.find((n) => n.kind === 'counter' && n.window === 0)!
+    expect(fire.start).toBe(hold.end)
+
+    // Strafe a full speed
+    move.setKey(50, hold.key, true)
+    move.advance(hold.end)
+    expect(move.speedFracAt(hold.end)).toBeGreaterThan(0.5)
+
+    // Release + counter opuesto (CS2 ~80 ms)
+    const t0 = eng.t0 + hold.end
+    move.setKey(t0, hold.key, false)
+    move.setKey(t0, counter.key, true)
+    move.advance(t0 + 90)
+    move.setKey(t0 + 90, counter.key, false)
+    expect(move.isAccurateAt(t0 + 90)).toBe(true)
+
+    // Disparo apenas quieto — dentro de la ventana FIRE (ya abierta)
+    const shootAt = t0 + 95
+    expect(shootAt).toBeGreaterThanOrEqual(eng.t0 + fire.start)
+    const ev = eng.press(shootAt)
+    expect(ev.some((e) => e.type === 'shot' || (e.type === 'pop' && e.label.includes('COUNTER')))).toBe(true)
+    expect(eng.windows[0].burst).not.toBeNull()
   })
 
   it('burst respeta balas por FIRE (elegibles) y alarga la ventana', () => {

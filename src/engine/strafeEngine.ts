@@ -303,19 +303,24 @@ export class StrafeEngine {
   }
 
   /**
-   * Counter-strafe real: después del strafe (AAAA) tenés que apretar la tecla opuesta (DDDD).
-   * Soltar solo A y disparar no cuenta.
+   * Counter-strafe real (CS2): soltar el strafe (A) y tocar la opuesta (D).
+   * Soltar solo A y disparar no cuenta. Con la opuesta frenás en ~80 ms y ya podés tirar.
    */
   hasCounterStrafe(w: WindowState, atPerfMs: number): boolean {
     if (w.counter) return true
     const hold = this.prevHold(w.note.window)
     const counter = this.counterNote(w.note.window)
     if (!hold || !counter) return false
+    const strafeKey: StrafeKey = hold.key
     const opposite: StrafeKey = counter.key
-    // Ventana: desde un poco antes de la nota counter hasta el momento del disparo/stop.
+    // Desde un poco antes del fin del hold hasta el disparo.
     const from = this.t0 + counter.start - 120
     const to = atPerfMs + 40
-    return this.keyLog.some((k) => k.key === opposite && k.down && k.t >= from && k.t <= to)
+    const pressedOpposite = this.keyLog.some((k) => k.key === opposite && k.down && k.t >= from && k.t <= to)
+    if (!pressedOpposite) return false
+    // La tecla de strafe tiene que haberse soltado (si no, wishDir=0 o seguís acelerando mal).
+    const releasedStrafe = this.keyLog.some((k) => k.key === strafeKey && !k.down && k.t >= from - 80 && k.t <= to)
+    return releasedStrafe || !this.keyDownAt(strafeKey, atPerfMs)
   }
 
   private keyDownAt(key: StrafeKey, t: number): boolean {
