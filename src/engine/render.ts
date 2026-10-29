@@ -724,31 +724,49 @@ function drawStrafeLanes(
   ctx.fillText('AHORA', hitLeft - 28, laneCy - laneH - 14)
   ctx.fillText('AHORA', hitRight + 28, laneCy - laneH - 14)
 
+  const FADE_AFTER_MS = 160
   for (const n of chart.notes) {
     if (n.kind === 'fire') continue
+    // No dibujar notas viejas: si no, A “pasada” cruza la mira y aparece a la derecha.
+    if (rel > n.end + FADE_AFTER_MS) continue
     const past = rel > n.end
     const active = rel >= n.start && rel <= n.end
     const isCounter = n.kind === 'counter'
+    const fade = past ? Math.max(0, 1 - (rel - n.end) / FADE_AFTER_MS) : 1
+    if (fade <= 0.02) continue
+
+    // Posición “como si” se moviera; después se clampa al carril propio.
     const lead = (n.start - rel) * pxPerMs
     const trail = (n.end - rel) * pxPerMs
-    // A: futuro a la izquierda → se mueve a la derecha hacia hitLeft
-    // D: futuro a la derecha → se mueve a la izquierda hacia hitRight
     let x1: number
     let x2: number
     if (n.key === 'a') {
-      x1 = hitLeft - lead
-      x2 = hitLeft - trail
+      // A: solo carril izquierdo. Al pasar, se queda pegada al hit y se desvanece.
+      x1 = past ? hitLeft - Math.max(isCounter ? 22 : 16, (n.end - n.start) * pxPerMs) : hitLeft - lead
+      x2 = past ? hitLeft : hitLeft - trail
     } else {
-      x1 = hitRight + lead
-      x2 = hitRight + trail
+      x1 = past ? hitRight : hitRight + lead
+      x2 = past ? hitRight + Math.max(isCounter ? 22 : 16, (n.end - n.start) * pxPerMs) : hitRight + trail
     }
-    const left = Math.min(x1, x2)
-    const right = Math.max(x1, x2)
+    let left = Math.min(x1, x2)
+    let right = Math.max(x1, x2)
+    // Clip duro: A nunca entra a la mira ni al carril D; D nunca al de A.
+    if (n.key === 'a') {
+      right = Math.min(right, hitLeft)
+      left = Math.min(left, right)
+      if (right <= 4) continue
+    } else {
+      left = Math.max(left, hitRight)
+      right = Math.max(right, left)
+      if (left >= layout.w - 4) continue
+    }
     const barW = Math.max(isCounter ? 22 : 16, right - left)
-    if (right < -40 || left > layout.w + 40) continue
+    if (barW < 2) continue
 
+    ctx.save()
+    ctx.globalAlpha = fade
     ctx.fillStyle = past
-      ? 'rgba(148,163,184,0.22)'
+      ? 'rgba(148,163,184,0.35)'
       : n.key === 'a'
         ? active
           ? 'rgba(56,189,248,0.9)'
@@ -768,6 +786,7 @@ function drawStrafeLanes(
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(isCounter ? `${n.key.toUpperCase()} CS` : n.key.toUpperCase(), left + barW / 2, laneCy)
+    ctx.restore()
   }
 
   // Próximo / activo FIRE: franja sobre la mira
