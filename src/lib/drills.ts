@@ -42,7 +42,7 @@ export const TRANSFER_MODES: { id: TransferMode; label: string; key: string; hin
 
 export const STRAFE_MODES: { id: StrafeMode; label: string; key: string; hint: string }[] = [
   { id: 'tap', label: 'Tap', key: 'Q', hint: 'AAAA → DDDD (counter) → 1 bala · sin counter no dispara' },
-  { id: 'burst', label: 'Burst', key: 'W', hint: 'AAAA → DDDD (counter) → 4 balas · sin counter no dispara' },
+  { id: 'burst', label: 'Burst', key: 'W', hint: 'AAAA → DDDD (counter) → N balas (elegís cuántas) · sin counter no dispara' },
 ]
 
 /** @deprecated usar RECOIL_MODES; se mantiene para compat de imports viejos */

@@ -124,7 +124,8 @@ export function bulletsForMode(weapon: WeaponDef, mode: DrillMode, customBullets
     case 'tap':
       return 1
     case 'burst':
-      return Math.min(4, weapon.magazine)
+      // Strafe burst: balas por ventana FIRE (elegibles en UI).
+      return Math.max(1, Math.min(weapon.magazine, Math.round(customBullets)))
   }
 }
 

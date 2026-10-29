@@ -26,14 +26,23 @@ const COUNTER_BEATS = 1
 /**
  * Partitura: AAAAA → DDDD (counter) → FIRE quieto → DDDDD → AAAA (counter) → FIRE…
  * Nunca se dispara solo después de una tecla: siempre hace falta el counter-strafe.
+ * En `burst`, `bulletsPerWindow` elige cuántas balas salen en cada FIRE (1…cargador).
  */
-export function buildStrafeChart(weapon: WeaponDef, mode: StrafeMode, seed: number): StrafeChart {
+export function buildStrafeChart(
+  weapon: WeaponDef,
+  mode: StrafeMode,
+  seed: number,
+  bulletsPerWindow = 8,
+): StrafeChart {
   const rnd = mulberry32(seed ^ 0x5bd1e995)
   const beatMs = weapon.cycleMs * 4
-  const bulletsPerWindow = mode === 'tap' ? 1 : Math.min(4, weapon.magazine)
+  const perWindow =
+    mode === 'tap'
+      ? 1
+      : Math.max(1, Math.min(weapon.magazine, Math.round(bulletsPerWindow)))
   const windows = mode === 'tap' ? 10 : 8
   const counterMs = COUNTER_BEATS * beatMs
-  const fireBeats = Math.max(1, Math.ceil(((bulletsPerWindow - 1) * weapon.cycleMs + REACT_AND_FIRE_MS) / beatMs))
+  const fireBeats = Math.max(1, Math.ceil(((perWindow - 1) * weapon.cycleMs + REACT_AND_FIRE_MS) / beatMs))
   const minHoldBeats = Math.max(1, Math.ceil(MIN_HOLD_MS / beatMs))
   const leadInMs = beatMs * 4
   const notes: ChartNote[] = []
@@ -47,11 +56,11 @@ export function buildStrafeChart(weapon: WeaponDef, mode: StrafeMode, seed: numb
     const counterEnd = holdEnd + counterMs
     notes.push({ kind: 'counter', key: opposite, start: holdEnd, end: counterEnd, window: w })
     const fireEnd = counterEnd + fireBeats * beatMs
-    notes.push({ kind: 'fire', start: counterEnd, end: fireEnd, bullets: bulletsPerWindow, window: w })
+    notes.push({ kind: 'fire', start: counterEnd, end: fireEnd, bullets: perWindow, window: w })
     t = fireEnd
     key = opposite
   }
-  return { beatMs, leadInMs, notes, windows, bulletsPerWindow, durationMs: t + beatMs }
+  return { beatMs, leadInMs, notes, windows, bulletsPerWindow: perWindow, durationMs: t + beatMs }
 }
 
 export function oppositeKey(key: StrafeKey): StrafeKey {

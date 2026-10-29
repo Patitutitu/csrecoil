@@ -63,7 +63,7 @@ describe('spray transfer', () => {
 describe('strafe chart', () => {
   it('es AAAA → counter opuesto → FIRE (nunca disparar solo con una tecla)', () => {
     const ak = WEAPON_BY_ID.ak47
-    const chart = buildStrafeChart(ak, 'burst', 7)
+    const chart = buildStrafeChart(ak, 'burst', 7, 4)
     expect(chart.windows).toBe(8)
     expect(chart.bulletsPerWindow).toBe(4)
     expect(chart.beatMs).toBe(ak.cycleMs * 4)
@@ -78,6 +78,18 @@ describe('strafe chart', () => {
     expect(holds[1].key).toBe(counters[0].key)
     expect(holds[0].end).toBe(counters[0].start)
     expect(counters[0].end).toBe(fires[0].start)
+  })
+
+  it('burst respeta balas por FIRE (elegibles) y alarga la ventana', () => {
+    const ak = WEAPON_BY_ID.ak47
+    const short = buildStrafeChart(ak, 'burst', 1, 4)
+    const long = buildStrafeChart(ak, 'burst', 1, 15)
+    expect(short.bulletsPerWindow).toBe(4)
+    expect(long.bulletsPerWindow).toBe(15)
+    expect(long.durationMs).toBeGreaterThan(short.durationMs)
+    expect(long.notes.filter((n) => n.kind === 'fire')[0].bullets).toBe(15)
+    // tap siempre 1
+    expect(buildStrafeChart(ak, 'tap', 1, 15).bulletsPerWindow).toBe(1)
   })
 })
 

@@ -18,6 +18,8 @@ export interface StrafeOptions {
   dpi: number
   seed: number
   movement: Movement
+  /** Balas por ventana FIRE en modo burst (tap siempre es 1). */
+  bulletsPerWindow?: number
 }
 
 /** Tiempo de reacción permitido al empezar una nota antes de exigir la tecla. */
@@ -89,7 +91,7 @@ export class StrafeEngine {
     this.dpi = opts.dpi
     this.seed = opts.seed
     this.movement = opts.movement
-    this.chart = buildStrafeChart(opts.weapon, opts.mode, opts.seed)
+    this.chart = buildStrafeChart(opts.weapon, opts.mode, opts.seed, opts.bulletsPerWindow ?? 8)
     this.windows = this.fireNotes.map((note) => ({
       note,
       stopMs: null,

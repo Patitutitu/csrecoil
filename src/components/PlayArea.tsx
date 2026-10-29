@@ -132,6 +132,7 @@ export function PlayArea({
         dpi: o.dpi,
         seed,
         movement,
+        bulletsPerWindow: o.customBullets,
       })
     } else {
       strafeRef.current = null
@@ -547,7 +548,11 @@ export function PlayArea({
           {gameLabel}
         </Badge>
         <Badge variant="outline" className="border-white/20 text-white/80">
-          {bullets} balas · {weapon.cycleMs} ms
+          {game === 'strafe'
+            ? mode === 'tap'
+              ? `1/FIRE · ${weapon.cycleMs} ms`
+              : `${bullets}/FIRE · ${weapon.cycleMs} ms`
+            : `${bullets} balas · ${weapon.cycleMs} ms`}
         </Badge>
         <Badge variant="outline" className="hidden border-white/20 text-white/60 sm:inline-flex">
           {bpmForCycle(weapon.cycleMs).toFixed(1)} BPM

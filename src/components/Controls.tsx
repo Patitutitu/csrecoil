@@ -48,12 +48,14 @@ export function Controls({
 }: ControlsProps) {
   const modes = modesForGame(game)
   const clampedCustom = Math.max(1, Math.min(weapon.magazine, customBullets))
-  const showCustom = game === 'recoil'
+  /** Spray: modo custom. Strafe burst: balas por cada FIRE. */
+  const showBulletPicker = game === 'recoil' || (game === 'strafe' && mode === 'burst')
 
   const setCustom = (n: number) => {
     const v = Math.max(1, Math.min(weapon.magazine, Math.round(n)))
     onCustomBullets(v)
-    if (mode !== 'custom') onMode('custom')
+    if (game === 'recoil' && mode !== 'custom') onMode('custom')
+    if (game === 'strafe' && mode !== 'burst') onMode('burst')
   }
 
   return (
@@ -135,7 +137,7 @@ export function Controls({
           <CardTitle>Ejercicio</CardTitle>
           <CardDescription>
             {game === 'strafe'
-              ? 'Ventanas de disparo quieto'
+              ? 'Ventanas de disparo quieto — en Burst elegís cuántas balas por FIRE'
               : game === 'transfer'
                 ? 'Objetivos en línea'
                 : 'Cuántas balas controlás — presets o a medida'}
@@ -159,11 +161,15 @@ export function Controls({
                 <span className="flex flex-col leading-tight">
                   <span className="font-medium">
                     {m.label}
-                    {game !== 'strafe' && (
+                    {game === 'strafe' && m.id === 'burst' ? (
+                      <span className="ml-1.5 text-xs text-white/50">({clampedCustom}/FIRE)</span>
+                    ) : game === 'strafe' && m.id === 'tap' ? (
+                      <span className="ml-1.5 text-xs text-white/50">(1)</span>
+                    ) : game !== 'strafe' ? (
                       <span className="ml-1.5 text-xs text-white/50">
                         ({bulletsForMode(weapon, m.id, clampedCustom)})
                       </span>
-                    )}
+                    ) : null}
                   </span>
                   <span className="text-[11px] text-white/50">{m.hint}</span>
                 </span>
@@ -171,29 +177,43 @@ export function Controls({
               </button>
             ))}
 
-          {showCustom && (
+          {showBulletPicker && (
             <div
               className={cn(
                 'mt-1 rounded-lg border px-2.5 py-2.5 transition-colors',
-                mode === 'custom'
-                  ? 'border-fuchsia-400/60 bg-fuchsia-500/15'
-                  : 'border-white/10 bg-white/[0.03]',
+                game === 'recoil'
+                  ? mode === 'custom'
+                    ? 'border-fuchsia-400/60 bg-fuchsia-500/15'
+                    : 'border-white/10 bg-white/[0.03]'
+                  : 'border-fuchsia-400/60 bg-fuchsia-500/15',
               )}
             >
-              <button
-                type="button"
-                className="mb-2 flex w-full items-center gap-2 text-left text-sm"
-                onClick={() => onMode('custom')}
-              >
-                <span className="flex flex-col leading-tight">
-                  <span className="font-medium text-white">
-                    Custom
-                    <span className="ml-1.5 tabular-nums text-xs text-fuchsia-200">{clampedCustom} balas</span>
+              {game === 'recoil' ? (
+                <button
+                  type="button"
+                  className="mb-2 flex w-full items-center gap-2 text-left text-sm"
+                  onClick={() => onMode('custom')}
+                >
+                  <span className="flex flex-col leading-tight">
+                    <span className="font-medium text-white">
+                      Custom
+                      <span className="ml-1.5 tabular-nums text-xs text-fuchsia-200">{clampedCustom} balas</span>
+                    </span>
+                    <span className="text-[11px] text-white/50">Elegí de 1 a {weapon.magazine} (cargador del arma)</span>
                   </span>
-                  <span className="text-[11px] text-white/50">Elegí de 1 a {weapon.magazine} (cargador del arma)</span>
-                </span>
-                <Key>C</Key>
-              </button>
+                  <Key>C</Key>
+                </button>
+              ) : (
+                <div className="mb-2 text-sm">
+                  <div className="font-medium text-white">
+                    Balas por FIRE
+                    <span className="ml-1.5 tabular-nums text-xs text-fuchsia-200">{clampedCustom}</span>
+                  </div>
+                  <div className="text-[11px] text-white/50">
+                    Cada vez que toca disparar: de 1 a {weapon.magazine} (cargador)
+                  </div>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -220,6 +240,25 @@ export function Controls({
                   <Plus className="size-3.5" />
                 </button>
                 <span className="w-8 text-right text-sm font-bold tabular-nums text-white">{clampedCustom}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {[4, 9, 15, weapon.magazine]
+                  .filter((n, i, arr) => n >= 1 && n <= weapon.magazine && arr.indexOf(n) === i)
+                  .map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={cn(
+                        'rounded-md border px-2 py-0.5 text-[11px] tabular-nums transition-colors',
+                        clampedCustom === n
+                          ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100'
+                          : 'border-white/10 text-white/60 hover:bg-white/10 hover:text-white',
+                      )}
+                      onClick={() => setCustom(n)}
+                    >
+                      {n === weapon.magazine ? `Full (${n})` : n}
+                    </button>
+                  ))}
               </div>
               <p className="mt-1.5 text-[10px] text-white/40">
                 Atajos: <kbd className="font-mono">−</kbd> / <kbd className="font-mono">+</kbd> o{' '}

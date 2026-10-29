@@ -241,12 +241,16 @@ export default function App() {
           break
         case '-':
         case '[':
-          if (game === 'recoil') setCustomBullets(customBullets - 1)
+          if (game === 'recoil' || (game === 'strafe' && mode === 'burst')) {
+            setCustomBullets(customBullets - 1)
+          }
           break
         case '+':
         case '=':
         case ']':
-          if (game === 'recoil') setCustomBullets(customBullets + 1)
+          if (game === 'recoil' || (game === 'strafe' && mode === 'burst')) {
+            setCustomBullets(customBullets + 1)
+          }
           break
         case 'tab':
           e.preventDefault()
@@ -290,7 +294,7 @@ export default function App() {
     setMode,
     setCustomBullets,
     patchSession,
-  ])
+  ]) // mode needed for strafe burst +/-
 
   return (
     <TooltipProvider>
