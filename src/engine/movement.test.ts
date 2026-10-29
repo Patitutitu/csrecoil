@@ -130,6 +130,13 @@ describe('strafe chart', () => {
     // tap siempre 1
     expect(buildStrafeChart(ak, 'tap', 1, 15).bulletsPerWindow).toBe(1)
   })
+
+  it('deja pausa (~1.1 s) después del FIRE antes del próximo A/D', () => {
+    const chart = buildStrafeChart(WEAPON_BY_ID.ak47, 'burst', 3, 4)
+    const fires = chart.notes.filter((n) => n.kind === 'fire')
+    const holds = chart.notes.filter((n) => n.kind === 'hold')
+    expect(holds[1].start - fires[0].end).toBeGreaterThanOrEqual(1000)
+  })
 })
 
 describe('strafe counter obligatorio', () => {

@@ -25,11 +25,16 @@ const MIN_HOLD_MS = 420
  * En CS2 el counter-strafe frena en ~80 ms; no bloqueamos el FIRE detrás de un beat entero.
  */
 const COUNTER_MS = 140
+/**
+ * Pausa después de terminar el recoil / ventana FIRE antes del próximo A/D.
+ * Da aire para ver impactos y no encadenar strafes a milisegundos.
+ */
+const RECOVERY_AFTER_FIRE_MS = 1100
 
 /**
- * Partitura: AAAAA → (counter D + FIRE a la vez) → DDDDD → (counter A + FIRE)…
- * Al soltar el strafe y tocar la tecla opuesta quedás quieto (~80 ms) y ya podés disparar:
- * la ventana FIRE arranca con el counter, no después de esperar 400 ms.
+ * Partitura: AAAAA → (counter D + FIRE) → pausa → DDDDD → (counter A + FIRE) → pausa…
+ * Al soltar el strafe y tocar la opuesta quedás quieto (~80 ms) y ya podés disparar.
+ * Después del spray hay delay antes del siguiente A/D.
  */
 export function buildStrafeChart(
   weapon: WeaponDef,
@@ -59,7 +64,8 @@ export function buildStrafeChart(
     notes.push({ kind: 'counter', key: opposite, start: holdEnd, end: holdEnd + COUNTER_MS, window: w })
     const fireEnd = holdEnd + fireMs
     notes.push({ kind: 'fire', start: holdEnd, end: fireEnd, bullets: perWindow, window: w })
-    t = fireEnd
+    // Respiro después del recoil antes del próximo strafe.
+    t = fireEnd + (w < windows - 1 ? RECOVERY_AFTER_FIRE_MS : 0)
     key = opposite
   }
   return { beatMs, leadInMs, notes, windows, bulletsPerWindow: perWindow, durationMs: t + beatMs }
