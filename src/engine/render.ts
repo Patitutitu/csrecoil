@@ -70,6 +70,11 @@ export interface StrafeFrame {
   judgments: Judgment[]
   speedFrac: number
   keys: { a: boolean; d: boolean }
+  /** Escala CS2 del panel central (mira + impactos). */
+  resWidth?: number
+  resHeight?: number
+  fov?: number
+  viewZoom?: number
 }
 
 export interface Viewport {
@@ -185,37 +190,39 @@ export function drawStrafeFrame(f: StrafeFrame): void {
   const { ctx, width, height, engine, now } = f
   drawBackgroundFlat(ctx, width, height)
   const rel = engine.status === 'idle' ? 0 : now - engine.t0
-  drawStrafeHighway(ctx, width, height, engine.chart, rel, engine)
+  const layout = strafeLayout(width, height)
+  drawStrafeLanes(ctx, layout, engine.chart, rel, engine)
+  drawStrafeMiraPanel(ctx, layout, f)
   drawSpeedBar(ctx, width, height, f.speedFrac)
-  drawKeyHud(ctx, width, height, f.keys, f.speedFrac)
+  drawStrafeSideKeys(ctx, layout, f.keys, f.speedFrac)
   drawStrafeHud(ctx, width, height, engine, f.judgments, now)
+}
 
-  // Mini spray del burst activo en la esquina
-  if (engine.burst && engine.burst.status !== 'idle') {
-    const mini: Frame = {
-      ctx,
-      width: Math.min(280, width * 0.35),
-      height: Math.min(200, height * 0.35),
-      now,
-      engine: engine.burst,
-      guideAlpha: 1,
-      pulses: f.pulses,
-      judgments: [],
-      reveal: engine.burst.status === 'finished',
-      speedFrac: f.speedFrac,
-      resWidth: 1920,
-      resHeight: 1080,
-      fov: 90,
-    }
-    ctx.save()
-    ctx.translate(width - mini.width - 12, height - mini.height - 48)
-    ctx.beginPath()
-    ctx.rect(0, 0, mini.width, mini.height)
-    ctx.clip()
-    drawFrame(mini)
-    ctx.restore()
+/** Geometría del nuevo Strafe: A← | MIRA | →D */
+function strafeLayout(w: number, h: number) {
+  const top = 44
+  const bottom = 64
+  const side = Math.max(88, Math.min(160, w * 0.16))
+  const miraW = Math.min(w - side * 2 - 16, w * 0.58)
+  const miraH = Math.min(h - top - bottom, h * 0.78)
+  const miraX = (w - miraW) / 2
+  const miraY = top + (h - top - bottom - miraH) / 2
+  return {
+    w,
+    h,
+    top,
+    bottom,
+    side,
+    mira: { x: miraX, y: miraY, w: miraW, h: miraH },
+    hitLeft: miraX,
+    hitRight: miraX + miraW,
+    laneCy: miraY + miraH * 0.5,
+    laneH: Math.min(56, miraH * 0.18),
+    pxPerMs: Math.max(0.08, (side + 24) / 1600),
   }
 }
+
+type StrafeLayout = ReturnType<typeof strafeLayout>
 
 function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, view: Viewport): void {
   const g = ctx.createRadialGradient(w / 2, h * 0.35, 10, w / 2, h * 0.35, Math.max(w, h) * 0.8)
@@ -684,89 +691,203 @@ function drawSpeedBar(ctx: CanvasRenderingContext2D, w: number, _h: number, spee
   ctx.restore()
 }
 
-function drawStrafeHighway(
+/**
+ * Carriles laterales: A entra de izquierda→derecha hacia la mira;
+ * D entra de derecha→izquierda. FIRE se marca en el panel central.
+ */
+function drawStrafeLanes(
   ctx: CanvasRenderingContext2D,
-  w: number,
-  h: number,
+  layout: StrafeLayout,
   chart: StrafeChart,
   rel: number,
   engine: StrafeEngine,
 ): void {
-  const hitY = h * 0.72
-  const pxPerMs = h / 2800
-  const lanes = {
-    a: w * 0.28,
-    fire: w * 0.5,
-    d: w * 0.72,
-  }
-  const laneW = Math.min(72, w * 0.12)
-
+  const { hitLeft, hitRight, laneCy, laneH, pxPerMs, mira } = layout
   ctx.save()
-  // líneas de carril
-  ctx.strokeStyle = 'rgba(148,163,184,0.15)'
-  for (const x of Object.values(lanes)) line(ctx, x, 40, x, h - 60)
-  // línea de golpe
+
+  // Pistas
+  ctx.fillStyle = 'rgba(56,189,248,0.06)'
+  roundRect(ctx, 8, laneCy - laneH, hitLeft - 16, laneH * 2, 10)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(251,146,60,0.06)'
+  roundRect(ctx, hitRight + 8, laneCy - laneH, layout.w - hitRight - 16, laneH * 2, 10)
+  ctx.fill()
+
+  // Líneas de golpe (bordes de la mira)
   ctx.strokeStyle = 'rgba(248,250,252,0.55)'
   ctx.lineWidth = 2
-  line(ctx, w * 0.15, hitY, w * 0.85, hitY)
-  ctx.fillStyle = 'rgba(248,250,252,0.7)'
-  ctx.font = '11px ui-sans-serif, system-ui, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.fillText('AHORA', w * 0.15, hitY - 6)
+  line(ctx, hitLeft, laneCy - laneH - 8, hitLeft, laneCy + laneH + 8)
+  line(ctx, hitRight, laneCy - laneH - 8, hitRight, laneCy + laneH + 8)
+  ctx.fillStyle = 'rgba(248,250,252,0.55)'
+  ctx.font = '10px ui-sans-serif, system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('AHORA', hitLeft - 28, laneCy - laneH - 14)
+  ctx.fillText('AHORA', hitRight + 28, laneCy - laneH - 14)
 
-  const drawNote = (n: ChartNote) => {
-    const y1 = hitY - (n.start - rel) * pxPerMs
-    const y2 = hitY - (n.end - rel) * pxPerMs
-    if (y2 > h + 40 || y1 < -40) return
-    if (n.kind === 'hold' || n.kind === 'counter') {
-      const x = lanes[n.key]
-      const top = Math.min(y1, y2)
-      const bot = Math.max(y1, y2)
-      const past = rel > n.end
-      const active = rel >= n.start && rel <= n.end
-      const isCounter = n.kind === 'counter'
-      ctx.fillStyle = past
-        ? 'rgba(148,163,184,0.25)'
-        : n.key === 'a'
-          ? active
-            ? 'rgba(56,189,248,0.85)'
-            : 'rgba(56,189,248,0.45)'
-          : active
-            ? 'rgba(251,146,60,0.85)'
-            : 'rgba(251,146,60,0.45)'
-      roundRect(ctx, x - laneW / 2, top, laneW, Math.max(isCounter ? 18 : 12, bot - top), 8)
-      ctx.fill()
-      if (isCounter) {
-        ctx.strokeStyle = active ? '#f8fafc' : 'rgba(248,250,252,0.55)'
-        ctx.lineWidth = 2
-        ctx.stroke()
-      }
-      ctx.fillStyle = '#fff'
-      ctx.font = isCounter ? '800 14px ui-sans-serif, system-ui, sans-serif' : '800 18px ui-sans-serif, system-ui, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(isCounter ? `${n.key.toUpperCase()} CS` : n.key.toUpperCase(), x, (top + bot) / 2)
+  for (const n of chart.notes) {
+    if (n.kind === 'fire') continue
+    const past = rel > n.end
+    const active = rel >= n.start && rel <= n.end
+    const isCounter = n.kind === 'counter'
+    const lead = (n.start - rel) * pxPerMs
+    const trail = (n.end - rel) * pxPerMs
+    // A: futuro a la izquierda → se mueve a la derecha hacia hitLeft
+    // D: futuro a la derecha → se mueve a la izquierda hacia hitRight
+    let x1: number
+    let x2: number
+    if (n.key === 'a') {
+      x1 = hitLeft - lead
+      x2 = hitLeft - trail
     } else {
-      const x = lanes.fire
-      const top = Math.min(y1, y2)
-      const bot = Math.max(y1, y2)
-      const wstate = engine.windows[n.window]
-      const done = wstate?.judged
-      ctx.fillStyle = done ? 'rgba(34,211,238,0.25)' : 'rgba(232,121,249,0.4)'
-      roundRect(ctx, x - laneW / 2, top, laneW, Math.max(16, bot - top), 8)
-      ctx.fill()
-      ctx.strokeStyle = 'rgba(232,121,249,0.9)'
+      x1 = hitRight + lead
+      x2 = hitRight + trail
+    }
+    const left = Math.min(x1, x2)
+    const right = Math.max(x1, x2)
+    const barW = Math.max(isCounter ? 22 : 16, right - left)
+    if (right < -40 || left > layout.w + 40) continue
+
+    ctx.fillStyle = past
+      ? 'rgba(148,163,184,0.22)'
+      : n.key === 'a'
+        ? active
+          ? 'rgba(56,189,248,0.9)'
+          : 'rgba(56,189,248,0.45)'
+        : active
+          ? 'rgba(251,146,60,0.9)'
+          : 'rgba(251,146,60,0.45)'
+    roundRect(ctx, left, laneCy - laneH * 0.55, barW, laneH * 1.1, 8)
+    ctx.fill()
+    if (isCounter) {
+      ctx.strokeStyle = active ? '#f8fafc' : 'rgba(248,250,252,0.5)'
       ctx.lineWidth = 2
       ctx.stroke()
-      ctx.fillStyle = '#fdf4ff'
-      ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(`FIRE ×${n.bullets}`, x, (top + bot) / 2)
     }
+    ctx.fillStyle = '#fff'
+    ctx.font = isCounter ? '800 13px ui-sans-serif, system-ui, sans-serif' : '800 16px ui-sans-serif, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(isCounter ? `${n.key.toUpperCase()} CS` : n.key.toUpperCase(), left + barW / 2, laneCy)
   }
 
-  for (const n of chart.notes) drawNote(n)
+  // Próximo / activo FIRE: franja sobre la mira
+  const fireNotes = chart.notes.filter((n): n is Extract<ChartNote, { kind: 'fire' }> => n.kind === 'fire')
+  for (const n of fireNotes) {
+    const active = rel >= n.start && rel <= n.end
+    const soon = !active && n.start - rel > 0 && n.start - rel < 900
+    if (!active && !soon) continue
+    const done = engine.windows[n.window]?.judged
+    const alpha = active ? 1 : Math.max(0.2, 1 - (n.start - rel) / 900)
+    ctx.save()
+    ctx.globalAlpha = alpha
+    ctx.strokeStyle = done ? 'rgba(34,211,238,0.7)' : 'rgba(232,121,249,0.95)'
+    ctx.lineWidth = active ? 4 : 2
+    roundRect(ctx, mira.x - 3, mira.y - 3, mira.w + 6, mira.h + 6, 14)
+    ctx.stroke()
+    if (active) {
+      ctx.fillStyle = 'rgba(232,121,249,0.12)'
+      roundRect(ctx, mira.x, mira.y, mira.w, 36, 0)
+      ctx.fill()
+      ctx.fillStyle = '#fdf4ff'
+      ctx.font = '800 16px ui-sans-serif, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(`FIRE ×${n.bullets} · QUIETO`, mira.x + mira.w / 2, mira.y + 18)
+    } else if (soon) {
+      ctx.fillStyle = 'rgba(232,121,249,0.75)'
+      ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(`FIRE en ${Math.ceil((n.start - rel) / 100) / 10}s`, mira.x + mira.w / 2, mira.y - 12)
+    }
+    ctx.restore()
+  }
+
+  ctx.restore()
+}
+
+/** Panel central grande: mira + path + impactos como en CS2. */
+function drawStrafeMiraPanel(ctx: CanvasRenderingContext2D, layout: StrafeLayout, f: StrafeFrame): void {
+  const { mira } = layout
+  const { engine, now } = f
+  ctx.save()
+  ctx.beginPath()
+  roundRect(ctx, mira.x, mira.y, mira.w, mira.h, 12)
+  ctx.clip()
+
+  if (engine.burst && engine.burst.status !== 'idle') {
+    const panel: Frame = {
+      ctx,
+      width: mira.w,
+      height: mira.h,
+      now,
+      engine: engine.burst,
+      guideAlpha: 1,
+      pulses: f.pulses,
+      judgments: [],
+      reveal: engine.burst.status === 'finished',
+      speedFrac: f.speedFrac,
+      resWidth: f.resWidth ?? 1920,
+      resHeight: f.resHeight ?? 1080,
+      fov: f.fov ?? 90,
+      viewZoom: f.viewZoom ?? 2.5,
+    }
+    ctx.translate(mira.x, mira.y)
+    drawFrame(panel)
+  } else {
+    // Mira en reposo: grilla CS2 + cruz en (0,0)
+    const view = computeViewport(mira.w, mira.h, [], {
+      resWidth: f.resWidth ?? 1920,
+      resHeight: f.resHeight ?? 1080,
+      fov: f.fov ?? 90,
+      viewZoom: f.viewZoom ?? 2.5,
+    })
+    ctx.translate(mira.x, mira.y)
+    drawBackground(ctx, mira.w, mira.h, view)
+    drawCrosshair(ctx, toScreen(view, { x: 0, y: 0 }), false, true)
+    ctx.fillStyle = 'rgba(226,232,240,0.45)'
+    ctx.font = '12px ui-sans-serif, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('Mira · compensá el recoil acá', mira.w / 2, mira.h - 18)
+  }
+  ctx.restore()
+
+  // Marco del panel
+  ctx.save()
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+  ctx.lineWidth = 1.5
+  roundRect(ctx, mira.x, mira.y, mira.w, mira.h, 12)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawStrafeSideKeys(
+  ctx: CanvasRenderingContext2D,
+  layout: StrafeLayout,
+  keys: { a: boolean; d: boolean },
+  speedFrac: number,
+): void {
+  const accurate = speedFrac <= ACCURATE_SPEED_FRACTION
+  const box = (label: string, on: boolean, x: number, y: number) => {
+    ctx.fillStyle = on ? (label === 'A' ? 'rgba(56,189,248,0.4)' : 'rgba(251,146,60,0.4)') : 'rgba(255,255,255,0.06)'
+    ctx.strokeStyle = on ? (label === 'A' ? '#38bdf8' : '#fb923c') : 'rgba(255,255,255,0.18)'
+    ctx.lineWidth = 2
+    roundRect(ctx, x, y, 52, 40, 10)
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = on ? '#fff' : 'rgba(255,255,255,0.5)'
+    ctx.font = '800 18px ui-sans-serif, system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(label, x + 26, y + 20)
+  }
+  const y = layout.h - 54
+  ctx.save()
+  box('A', keys.a, Math.max(12, layout.hitLeft / 2 - 26), y)
+  box('D', keys.d, Math.min(layout.w - 64, (layout.hitRight + layout.w) / 2 - 26), y)
+  ctx.font = '600 11px ui-sans-serif, system-ui, sans-serif'
+  ctx.fillStyle = accurate ? '#4ade80' : '#fb7185'
+  ctx.textAlign = 'center'
+  ctx.fillText(accurate ? 'QUIETO · PRECISIÓN' : 'EN MOVIMIENTO · DISPERSIÓN', layout.w / 2, y + 20)
   ctx.restore()
 }
 

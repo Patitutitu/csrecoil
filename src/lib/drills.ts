@@ -22,7 +22,7 @@ export const GAMES: {
   {
     id: 'strafe',
     label: 'Strafe',
-    hint: 'AAAA→DDDD (counter) y recién ahí disparás quieto. Solo A y disparar = inválido',
+    hint: 'A← mira →D: counter y spray en el centro como en CS2',
     icon: Keyboard,
   },
 ]
